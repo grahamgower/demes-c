@@ -208,8 +208,7 @@ demes_deme_add_epoch(
     struct demes_deme *deme, double end_time, double start_size, double end_size,
     enum size_function size_function, double selfing_rate, double cloning_rate)
 {
-    struct demes_epoch *epochs, *epoch;
-    size_t size;
+    struct demes_epoch *epoch;
     int ret = 0;
     double start_time;
 
@@ -278,22 +277,14 @@ demes_deme_add_epoch(
         goto err0;
     }
 
-    size = (sizeof *epochs) * (deme->n_epochs + 1);
-    epochs = realloc(deme->epochs, size);
-    if (epochs == NULL) {
-        perror("realloc");
-        ret = DEMES_ERR_MEMORY;
-        goto err0;
-    }
-    deme->epochs = epochs;
-    deme->n_epochs++;
-    epoch = &epochs[deme->n_epochs - 1];
+    epoch = &deme->epochs[deme->n_epochs];
     epoch->end_time = end_time;
     epoch->start_size = start_size;
     epoch->end_size = end_size;
     epoch->size_function = size_function;
     epoch->selfing_rate = selfing_rate;
     epoch->cloning_rate = cloning_rate;
+    deme->n_epochs++;
 
 err0:
     return ret;
@@ -1295,7 +1286,23 @@ demes_graph_parse_epochs(
             goto err0;
         }
         n_epochs = epochs->data.sequence.items.top - epochs->data.sequence.items.start;
-        assert(n_epochs > 0);
+        if (n_epochs == 0) {
+            /* We could actually allow this case if there were a valid
+             * defaults.epoch, but then explicitly specifying an empty list
+             * is unnecessary. This is quite weird, so just raise an error.
+             */
+            errmsg("line %ld: deme %s: epochs must be a list of epoch objects\n",
+                    epochs->start_mark.line, deme->name);
+            ret = DEMES_ERR_VALUE;
+            goto err0;
+        }
+    }
+
+    deme->epochs = calloc(n_epochs, sizeof *deme->epochs);
+    if (deme->epochs == NULL) {
+        perror("calloc");
+        ret = DEMES_ERR_MEMORY;
+        goto err0;
     }
 
     for (i=0; i<n_epochs; i++) {
