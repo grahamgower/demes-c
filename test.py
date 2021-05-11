@@ -6,13 +6,12 @@ import pytest
 import hypothesis as hyp
 import hypothesis.strategies as st
 import demes
-
-from demes_delete_me import graphs
+import demes.hypothesis_strategies
 
 
 @st.composite
-def permitted_graphs(draw):
-    graph = draw(graphs())
+def filtered_graphs(draw):
+    graph = draw(demes.hypothesis_strategies.graphs())
 
     def is_ascii(s):
         return all(ord(c) < 128 for c in s)
@@ -45,11 +44,9 @@ def compare_resolvers(graph1):
 @hyp.settings(
     max_examples=1000,
     deadline=None,
-    suppress_health_check=[
-        hyp.HealthCheck.too_slow, hyp.HealthCheck.filter_too_much
-        ],
+    suppress_health_check=[hyp.HealthCheck.too_slow, hyp.HealthCheck.filter_too_much],
 )
-@hyp.given(permitted_graphs())
+@hyp.given(filtered_graphs())
 def test_random_graphs(graph):
     compare_resolvers(graph)
 
