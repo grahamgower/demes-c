@@ -980,11 +980,13 @@ get_string_list(
         }
 
         length = list->data.sequence.items.top - list->data.sequence.items.start;
-        strings = calloc(length, sizeof *strings);
-        if (strings == NULL) {
-            perror("calloc");
-            ret = DEMES_ERR_MEMORY;
-            goto err0;
+        if (length > 0) {
+            strings = calloc(length, sizeof *strings);
+            if (strings == NULL) {
+                perror("calloc");
+                ret = DEMES_ERR_MEMORY;
+                goto err0;
+            }
         }
 
         for (i=0; i<length; i++) {
@@ -1107,11 +1109,13 @@ get_number_list(
         }
 
         length = list->data.sequence.items.top - list->data.sequence.items.start;
-        numbers = calloc(length, sizeof *numbers);
-        if (numbers == NULL) {
-            perror("calloc");
-            ret = DEMES_ERR_MEMORY;
-            goto err0;
+        if (length > 0) {
+            numbers = calloc(length, sizeof *numbers);
+            if (numbers == NULL) {
+                perror("calloc");
+                ret = DEMES_ERR_MEMORY;
+                goto err0;
+            }
         }
 
         for (i=0; i<length; i++) {
@@ -1925,13 +1929,20 @@ demes_graph_parse_demes(
     int n_demes;
 
     if (demes->type != YAML_SEQUENCE_NODE) {
-        errmsg("line %ld: demes must be a list of deme objects\n",
+        errmsg("line %ld: demes must be a list of one or more deme objects\n",
                 demes->start_mark.line);
         ret = DEMES_ERR_TYPE;
         goto err0;
     }
 
     n_demes = demes->data.sequence.items.top - demes->data.sequence.items.start;
+
+    if (n_demes == 0) {
+        errmsg("line %ld: demes must be a list of one or more deme objects\n",
+                demes->start_mark.line);
+        ret = DEMES_ERR_MISSING_REQUIRED;
+        goto err0;
+    }
 
     graph->demes = calloc(n_demes, sizeof *graph->demes);
     if (graph->demes == NULL) {

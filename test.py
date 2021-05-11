@@ -46,7 +46,7 @@ def compare_resolvers(graph1):
     max_examples=1000,
     deadline=None,
     suppress_health_check=[
-        hyp.HealthCheck.too_slow, #hyp.HealthCheck.filter_too_much
+        hyp.HealthCheck.too_slow, hyp.HealthCheck.filter_too_much
         ],
 )
 @hyp.given(permitted_graphs())
