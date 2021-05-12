@@ -12,15 +12,38 @@ demes.o: demes.c demes.h
 
 unicodectype.o: unicodectype.c unicodetype_db.h
 
-test: memcheck pytest
+test: memcheck-valid memcheck-invalid pytest
 
-# Resolve all the example files under valgrind to check for memory errors.
-memcheck: resolve 
-	for yaml in examples/*.yaml examples/tutorial/*.yaml; do \
-		valgrind -q --leak-check=full ./resolve $$yaml >/dev/null ; \
-		if [ $$? != "0" ]; then \
-			echo "$$yaml: failed" ; \
+# Resolve the valid example models under valgrind to check for memory errors.
+memcheck-valid: resolve
+	for yaml in examples/*.yaml examples/tutorial/*.yaml ; do \
+		valgrind -q --leak-check=full --error-exitcode=255 \
+			./resolve $$yaml >/dev/null ; \
+		ret=$$? ; \
+		if [ $$ret -ge "128" ]; then \
+			echo "$$yaml: memory error" ; \
 			exit 1 ; \
+		elif [ "$$ret" != "0" ]; then \
+			echo "$$yaml: failed to resolve valid model" ; \
+			exit 2 ; \
+		fi \
+	done
+
+# Check that the resolver raises errors for invalid models,
+# and that there are no memory leaks.
+memcheck-invalid: resolve
+	for yaml in \
+		examples/bad-models/*.yaml; \
+	do \
+		valgrind -q --leak-check=full --error-exitcode=255 \
+			./resolve $$yaml >/dev/null ; \
+		ret=$$? ; \
+		if [ $$ret -ge "128" ]; then \
+			echo "$$yaml: memory error" ; \
+			exit 1 ; \
+		elif [ $$ret = "0" ]; then \
+			echo "$$yaml: failed to reject invalid model" ; \
+			exit 2 ; \
 		fi \
 	done
 

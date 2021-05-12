@@ -41,7 +41,8 @@ def test_random_graphs(graph):
 
 def example_files():
     example_dir = pathlib.Path("examples")
-    files = list(example_dir.glob("**/*.yaml"))
+    files = list(example_dir.glob("*.yaml"))
+    files += list((example_dir / "tutorial").glob("*.yaml"))
     assert len(files) > 1
     return files
 

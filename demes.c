@@ -78,6 +78,9 @@ struct demelevel_defaults {
  *        sane, standard or portable way to print non-ASCII chars though.
  *      * This is a library, so we shouldn't print anything to the terminal.
  */
+#ifdef __GNUC__
+__attribute__ ((format (printf, 1, 2)))
+#endif
 static void
 errmsg(const char *fmt, ...)
 {
@@ -364,7 +367,7 @@ demes_graph_add_deme(
     int ret = 0;
 
     if (get_deme_id(graph, name) != -1) {
-        errmsg("demes[%zd]: %s already present in the graph.",
+        errmsg("demes[%zd]: %s already present in the graph.\n",
                 graph->n_demes, name);
         ret = DEMES_ERR_VALUE;
         goto err0;
@@ -405,13 +408,33 @@ demes_graph_add_deme(
         }
 
         for (i=0; i<n_ancestors; i++) {
-            if (get_deme_id(graph, ancestors[i]) == -1) {
+            struct demes_deme *ancestor;
+            double anc_end_time;
+            int j;
+
+            if ((ancestor = demes_graph_get_deme(graph, ancestors[i])) == NULL) {
                 errmsg("deme %s: ancestor deme '%s' not found. "
                         "Note: ancestor demes must be specified "
                         "before their children.\n",
                         name, ancestors[0]);
                 ret = DEMES_ERR_VALUE;
                 goto err0;
+            }
+            anc_end_time = ancestor->epochs[ancestor->n_epochs - 1].end_time;
+            if (!(ancestor->start_time > start_time && start_time >= anc_end_time)) {
+                errmsg("deme %s: start_time=%lf is outside the interval of "
+                        "existance for ancestor %s (%lf, %lf]\n",
+                        name, start_time, ancestor->name, ancestor->start_time,
+                        anc_end_time);
+                ret = DEMES_ERR_VALUE;
+                goto err0;
+            }
+            for (j=0; j<i; j++) {
+                if (!u8_strcmp(ancestor->name, ancestors[j])) {
+                    errmsg("demes %s: duplicate ancestor '%s'\n", name, ancestors[j]);
+                    ret = DEMES_ERR_VALUE;
+                    goto err0;
+                }
             }
         }
 
@@ -432,6 +455,12 @@ demes_graph_add_deme(
                 goto err0;
             }
         }
+    }
+
+    if (!ancestors && !isinf(start_time)) {
+        errmsg("deme %s: finite start_time, but no ancestors specified\n", name);
+        ret = DEMES_ERR_MISSING_REQUIRED;
+        goto err0;
     }
 
     deme = &graph->demes[graph->n_demes];
@@ -557,26 +586,27 @@ demes_graph_add_migration(
     int ret = 0;
 
     if ((source_deme = demes_graph_get_deme(graph, source)) == NULL) {
-        errmsg("migrations[%d]: deme '%s' not in graph\n",
+        errmsg("migrations[%zd]: deme '%s' not in graph\n",
                 graph->n_migrations, source);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
     if ((dest_deme = demes_graph_get_deme(graph, dest)) == NULL) {
-        errmsg("migrations[%d]: deme '%s' not in graph\n",
+        errmsg("migrations[%zd]: deme '%s' not in graph\n",
                 graph->n_migrations, dest);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
     if (source_deme == dest_deme) {
-        errmsg("pulses[%d]: source and dest cannot be the same deme\n");
+        errmsg("migrations[%zd]: source and dest cannot be the same deme\n",
+                graph->n_migrations);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
 
     time_intersection(source_deme, dest_deme, &time_hi, &time_lo);
     if (time_hi <= time_lo) {
-        errmsg("migrations[%d]: deme %s and deme %s never coexist\n",
+        errmsg("migrations[%zd]: deme %s and deme %s never coexist\n",
                 graph->n_migrations, source, dest);
         ret = DEMES_ERR_VALUE;
         goto err0;
@@ -585,7 +615,7 @@ demes_graph_add_migration(
     if (isnan(start_time)) {
         start_time = time_hi;
     } else if (start_time > time_hi || start_time <= time_lo) {
-        errmsg("migrations[%d]: must have %d >= start_time > %d, "
+        errmsg("migrations[%zd]: must have %lf >= start_time > %lf, "
                 "as defined by the time-intersection of deme %s and deme %s\n",
                 graph->n_migrations, time_hi, time_lo, source, dest);
         ret = DEMES_ERR_VALUE;
@@ -595,7 +625,7 @@ demes_graph_add_migration(
     if (isnan(end_time)) {
         end_time = time_lo;
     } else if (end_time >= time_hi || end_time < time_lo) {
-        errmsg("migrations[%d]: must have %d > end_time >= %d, "
+        errmsg("migrations[%zd]: must have %lf > end_time >= %lf, "
                 "as defined by the time-intersection of deme %s and deme %s\n",
                 graph->n_migrations, time_hi, time_lo, source, dest);
         ret = DEMES_ERR_VALUE;
@@ -603,14 +633,16 @@ demes_graph_add_migration(
     }
 
     if (rate < 0 || rate > 1) {
-        errmsg("migrations[%d]: must have 0 >= rate >= 1\n");
+        errmsg("migrations[%zd]: must have 0 >= rate >= 1\n",
+                graph->n_migrations);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
 
     if (overlapping_migrations(graph, source, dest, start_time, end_time)) {
-        errmsg("migrations[%d]: migrations already exist from source deme %s "
-                "to dest deme %s for the time interval (start_time=%d, end_time=%d]\n",
+        errmsg("migrations[%zd]: migrations already exist from source deme %s "
+                "to dest deme %s for the time interval "
+                "(start_time=%lf, end_time=%lf]\n",
                 graph->n_migrations, source, dest, start_time, end_time);
         ret = DEMES_ERR_VALUE;
         goto err0;
@@ -653,9 +685,16 @@ demes_graph_add_symmetric_migration(
     int ret = 0;
     int i, j;
 
+    if (n_demes < 2) {
+        errmsg("migration[%zd]: must specify a list of two or more deme names\n",
+                graph->n_migrations);
+        ret = DEMES_ERR_VALUE;
+        goto err0;
+    }
+
     for (i=0; i<n_demes; i++) {
         if (demes_graph_get_deme(graph, demes[i]) == NULL) {
-            errmsg("migration[%d]: deme '%s' not in graph\n",
+            errmsg("migration[%zd]: deme '%s' not in graph\n",
                     graph->n_migrations, demes[i]);
             ret = DEMES_ERR_VALUE;
             goto err0;
@@ -697,46 +736,49 @@ demes_graph_add_pulse(
     int i;
 
     if ((source_deme = demes_graph_get_deme(graph, source)) == NULL) {
-        errmsg("pulses[%d]: deme '%s' not in graph\n",
+        errmsg("pulses[%zd]: deme '%s' not in graph\n",
                 graph->n_pulses, source);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
     if ((dest_deme = demes_graph_get_deme(graph, dest)) == NULL) {
-        errmsg("pulses[%d]: deme '%s' not in graph\n",
+        errmsg("pulses[%zd]: deme '%s' not in graph\n",
                 graph->n_pulses, dest);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
     if (source_deme == dest_deme) {
-        errmsg("pulses[%d]: source and dest cannot be the same deme\n");
+        errmsg("pulses[%zd]: source and dest cannot be the same deme\n",
+                graph->n_pulses);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
 
     time_intersection(source_deme, dest_deme, &time_hi, &time_lo);
     if (time_hi <= time_lo) {
-        errmsg("pulses[%d]: deme %s and deme %s never coexist\n",
+        errmsg("pulses[%zd]: deme %s and deme %s never coexist\n",
                 graph->n_pulses, source, dest);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
 
     if (time > time_hi || time <= time_lo) {
-        errmsg("pulses[%d]: must have %d >= time > %d, "
+        errmsg("pulses[%zd]: must have %lf >= time > %lf, "
                 "as defined by the time-intersection of deme %s and deme %s\n",
                 graph->n_pulses, time_hi, time_lo, source, dest);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
     if (time == dest_deme->epochs[dest_deme->n_epochs - 1].end_time) {
-        errmsg("pulses[%d]: invalid pulse at time %d, which is dest deme %s's end_time\n",
+        errmsg("pulses[%zd]: invalid pulse at time %lf, which is dest "
+                "deme %s's end_time\n",
                 graph->n_pulses, time, dest);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
     if (time == source_deme->start_time) {
-        errmsg("pulses[%d]: invalid pulse at time %d, which is source deme %s's start_time\n",
+        errmsg("pulses[%zd]: invalid pulse at time %lf, which is source "
+                "deme %s's start_time\n",
                 graph->n_pulses, time, source);
         ret = DEMES_ERR_VALUE;
         goto err0;
@@ -754,8 +796,9 @@ demes_graph_add_pulse(
         }
     }
     if (sum > 1.0) {
-        errmsg("pulses[%d]: sum of pulse proportions > 1 for dest deme %s "
-                "at time %d\n");
+        errmsg("pulses[%zd]: sum of pulse proportions > 1 for dest deme %s "
+                "at time %lf\n",
+                graph->n_pulses, dest, time);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
@@ -1172,7 +1215,11 @@ check_allowed_mapping(
     int i, j;
     int ret;
 
-    assert(node->type == YAML_MAPPING_NODE);
+    if (node->type != YAML_MAPPING_NODE) {
+        errmsg("line %ld: expected key/value pairs.\n", node->start_mark.line);
+        ret = DEMES_ERR_TYPE;
+        goto err0;
+    }
 
     n_pairs = node->data.mapping.pairs.top - node->data.mapping.pairs.start;
 
@@ -1419,7 +1466,7 @@ demes_graph_parse_epochs(
                     errmsg("deme %s: first epoch must have a start_size or end_size\n",
                             deme->name);
                 } else {
-                    errmsg("deme %s: no epochs defined");
+                    errmsg("deme %s: no epochs defined\n", deme->name);
                 }
                 ret = DEMES_ERR_MISSING_REQUIRED;
                 goto err0;
@@ -2256,8 +2303,8 @@ migration_matrices(
 
                 if (mm_list[x] > 0) {
                     errmsg("multiple migrations defined for source deme %s "
-                            "and dest deme %s for the time interval [%d, %d]\n",
-                            migration->source, migration->dest,
+                            "and dest deme %s for the time interval [%lf, %lf]\n",
+                            migration->source->name, migration->dest->name,
                             start_time, end_time);
                     ret = DEMES_ERR_VALUE;
                     goto err1;
@@ -2313,7 +2360,7 @@ check_migration_rates(struct demes_graph *graph)
             }
             if (sum > 1.0) {
                 errmsg("sum of migration rates into deme %s is greater than 1 "
-                        "for the time interval (%d, %d]\n",
+                        "for the time interval (%lf, %lf]\n",
                         graph->demes[j].name, start_time, end_time);
                 ret = DEMES_ERR_VALUE;
                 goto err1;
@@ -2414,7 +2461,7 @@ demes_graph_parse_migrations(
             }
         }
         if (isnan(rate)) {
-            errmsg("line %ld: migration[%d]: required field 'rate' not found",
+            errmsg("line %ld: migration[%d]: required field 'rate' not found\n",
                     migration->start_mark.line, i);
             ret = DEMES_ERR_MISSING_REQUIRED;
             goto err1;
@@ -2422,11 +2469,11 @@ demes_graph_parse_migrations(
 
         if (!((source && dest && demes == NULL) ||
                     (source == NULL && dest == NULL && demes))) {
-            errmsg("line %d: migration[%d]: must specify both source and dest "
+            errmsg("line %ld: migration[%d]: must specify both source and dest "
                     "demes, or alternately specify a list of deme names\n",
                     migration->start_mark.line, i);
             ret = DEMES_ERR_VALUE;
-            goto err0;
+            goto err1;
         }
 
         if (demes) {
@@ -2806,7 +2853,7 @@ err0:
 static int
 append_mapping_sequence(
     yaml_document_t *document, int node, char *key,
-    yaml_mapping_style_t style, int *value_node)
+    yaml_sequence_style_t style, int *value_node)
 {
     int k, v;
     int ret = 0;
@@ -3002,7 +3049,7 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
         int deme_node, epochs_node;
 
         if ((ret = append_sequence_mapping(&document, demes_node,
-                        YAML_BLOCK_SEQUENCE_STYLE, &deme_node))) {
+                        YAML_BLOCK_MAPPING_STYLE, &deme_node))) {
             ret = DEMES_ERR_YAML;
             goto err3;
         }
