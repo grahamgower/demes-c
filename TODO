@@ -1,4 +1,3 @@
-* Support unicode in deme names.
 * Construct yaml files for a wide range of error conditions.
 * Migration error messages indicate an index into the migrations list.
   But this may not correspond to the index into the migrations list in

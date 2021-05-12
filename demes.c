@@ -95,48 +95,73 @@ is_close(double a, double b) {
     return fabs(b - a) < 1e-9;
 }
 
+/*
+ * Sets out_codepoint to the current utf8 codepoint in str, and returns the
+ * address of the next utf8 codepoint after the current one in str.
+ *
+ * Stolen from https://github.com/sheredom/utf8.h/blob/master/utf8.h
+ */
+static void *
+utf8codepoint(const void *restrict str, uint32_t *restrict out_codepoint)
+{
+    const char *s = (const char *)str;
+
+    if (0xf0 == (0xf8 & s[0])) {
+        // 4 byte utf8 codepoint
+        *out_codepoint = ((0x07 & s[0]) << 18) | ((0x3f & s[1]) << 12) |
+                         ((0x3f & s[2]) << 6) | (0x3f & s[3]);
+        s += 4;
+    } else if (0xe0 == (0xf0 & s[0])) {
+        // 3 byte utf8 codepoint
+        *out_codepoint =
+            ((0x0f & s[0]) << 12) | ((0x3f & s[1]) << 6) | (0x3f & s[2]);
+        s += 3;
+    } else if (0xc0 == (0xe0 & s[0])) {
+        // 2 byte utf8 codepoint
+        *out_codepoint = ((0x1f & s[0]) << 6) | (0x3f & s[1]);
+        s += 2;
+    } else {
+        // 1 byte utf8 codepoint otherwise
+        *out_codepoint = s[0];
+        s += 1;
+    }
+
+    return (void *)s;
+}
+
 /**
  * Check if the given deme name is valid.
  *
- * Deme names must be python identifiers. Lots of unicode is allowed,
- * but for now this function assumes ASCII only names.
- *
+ * Deme names must be python identifiers. Lots of unicode is allowed.
  * https://docs.python.org/3/reference/lexical_analysis.html#identifiers
- *
- * "Within the ASCII range (U+0001..U+007F), the valid characters for
- *  identifiers are the same as in Python 2.x: the uppercase and lowercase
- *  letters A through Z, the underscore _ and, except for the first character,
- *  the digits 0 through 9."
- *
- * TODO: check for permitted non-ASCII chars.
  *
  * @return 1 if the name is a valid deme name, 0 otherwise.
  */
 static int
 is_valid_deme_name(demes_char_t *name)
 {
-    demes_char_t *c;
-    for (c=name; *c!='\0'; c++) {
-        if (c == name) {
-            // leading char
-            if (!((*c >= 'a' && *c <= 'z') ||
-                  (*c >= 'A' && *c <= 'Z') ||
-                   *c == '_')) {
-                return 0;
-            }
-        } else {
-            // subsequent chars
-            if (!((*c >= 'a' && *c <= 'z') ||
-                  (*c >= 'A' && *c <= 'Z') ||
-                  (*c >= '0' && *c <= '9') ||
-                   *c == '_')) {
-                return 0;
-            }
-        }
-    }
-    if (c == name) {
+    demes_char_t *c = name;
+    uint32_t ucp; // unicode code point
+    extern int _PyUnicode_IsXidStart(uint32_t ch);
+    extern int _PyUnicode_IsXidContinue(uint32_t ch);
+
+    if (c == NULL || *c == '\0') {
         // empty string is not valid
         return 0;
+    }
+
+    // leading char
+    c = utf8codepoint(c, &ucp);
+    if (!_PyUnicode_IsXidStart(ucp) && ucp != '_') {
+        return 0;
+    }
+
+    while (*c != '\0') {
+        // subsequent chars
+        c = utf8codepoint(c, &ucp);
+        if (!_PyUnicode_IsXidContinue(ucp)) {
+            return 0;
+        }
     }
     return 1;
 }
@@ -1010,7 +1035,7 @@ err0:
  *
  * @return The number, or NAN if the string couldn't be converted to a number.
  */
-double
+static double
 parse_number(char *string)
 {
     char *endptr;
@@ -2723,7 +2748,7 @@ err0:
     return ret;
 }
 
-void
+static void
 double_to_string(char *buf, size_t buflen, double num)
 {
     assert(!isnan(num));

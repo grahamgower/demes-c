@@ -2,8 +2,15 @@ CFLAGS=-Wall -O2 -g
 # We use two posix extensions, strdup() and newlocale()/uselocale().
 CC=gcc -std=c11 -D_POSIX_C_SOURCE=200809L
 
-resolve: resolve.c demes.c demes.h
-	$(CC) $(CFLAGS) $^ -o $@ -lyaml
+resolve: resolve.c libdemes.a
+	$(CC) $(CFLAGS) resolve.c -o $@ -lyaml -L. -ldemes
+
+libdemes.a: demes.o unicodectype.o
+	$(AR) r $@ $^
+
+demes.o: demes.c demes.h
+
+unicodectype.o: unicodectype.c unicodetype_db.h
 
 test: memcheck pytest
 
@@ -22,4 +29,4 @@ pytest: resolve
 	pytest -n auto --hypothesis-show-statistics test.py
 
 clean:
-	rm -f resolve
+	rm -f resolve libdemes.a *.o

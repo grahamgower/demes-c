@@ -4,20 +4,8 @@ import pathlib
 
 import pytest
 import hypothesis as hyp
-import hypothesis.strategies as st
 import demes
 import demes.hypothesis_strategies
-
-
-@st.composite
-def filtered_graphs(draw):
-    graph = draw(demes.hypothesis_strategies.graphs())
-
-    def is_ascii(s):
-        return all(ord(c) < 128 for c in s)
-
-    hyp.assume(all(is_ascii(deme.name) for deme in graph.demes))
-    return graph
 
 
 def resolve(filename: str) -> str:
@@ -46,7 +34,7 @@ def compare_resolvers(graph1):
     deadline=None,
     suppress_health_check=[hyp.HealthCheck.too_slow, hyp.HealthCheck.filter_too_much],
 )
-@hyp.given(filtered_graphs())
+@hyp.given(demes.hypothesis_strategies.graphs())
 def test_random_graphs(graph):
     compare_resolvers(graph)
 
