@@ -4,6 +4,10 @@
 #include <yaml.h>
 #include "demes.h"
 
+#ifdef MOCKFAIL
+#include "mockfail.c"
+#endif
+
 int
 main(int argc, char **argv)
 {

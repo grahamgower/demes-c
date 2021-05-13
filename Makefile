@@ -3,7 +3,12 @@ CFLAGS=-Wall -O2 -g
 CC=gcc -std=c11 -D_POSIX_C_SOURCE=200809L
 
 resolve: resolve.c libdemes.a
-	$(CC) $(CFLAGS) resolve.c -o $@ -L. -ldemes -lyaml
+	$(CC) $(CFLAGS) $(LDFLAGS) resolve.c -o $@ -L. -ldemes -lyaml
+
+mocked-resolve:
+	$(MAKE) LDFLAGS="-Wl,--wrap=malloc -Wl,--wrap=calloc -Wl,--wrap=realloc -Wl,--wrap=strdup" \
+		CFLAGS="-Wall -O0 -g --coverage -DMOCKFAIL" resolve
+	mv resolve mocked-resolve
 
 libdemes.a: demes.o unicodectype.o
 	$(AR) r $@ $^
@@ -51,12 +56,23 @@ memcheck-invalid: resolve
 pytest: resolve
 	pytest -n auto --hypothesis-show-statistics test.py
 
-coverage:
-	$(MAKE) clean
-	$(MAKE) CFLAGS="-Wall -O0 -g --coverage"
-	find examples -name "*.yaml" -exec ./resolve {} \; > /dev/null 2>&1
+# Generate a code coverage report for the tests.
+coverage: clean mocked-resolve
+	find examples -name "*.yaml" -exec ./mocked-resolve {} \; > /dev/null 2>&1
+	for yaml in examples/*.yaml examples/tutorial/*.yaml; do \
+		for i in `seq 0 1000000`; do \
+			FAIL_AFTER=$$i ./mocked-resolve $$yaml >/dev/null 2>&1 ; \
+			ret=$$? ; \
+			if [ $$ret = "0" ]; then \
+				break ; \
+			elif [ $$ret -ge 128 ]; then \
+				echo "$$yaml: unexpected exit code $$ret with FAIL_AFTER=$$i" ; \
+				exit $$ret ; \
+			fi ; \
+		done ; \
+	done
 	gcov -p *.c
 
 clean:
-	rm -f resolve libdemes.a *.o
+	rm -f resolve mocked-resolve libdemes.a *.o
 	rm -f *.gcda *.gcno *.gcov

@@ -942,7 +942,7 @@ demes_graph_init(
     *_graph = graph;
 
 err0:
-    if (ret != 0) {
+    if (ret) {
         demes_graph_free(graph);
     }
     return ret;

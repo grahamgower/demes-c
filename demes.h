@@ -17,6 +17,7 @@ typedef yaml_char_t demes_char_t;
 
 /* error codes */
 enum {
+    DEMES_SUCCESS=0,
     DEMES_ERR_MEMORY, /* calloc, realloc, strdup, etc. */
     DEMES_ERR_IO, /* fopen */
     DEMES_ERR_LOCALE, /* newlocale, uselocale */
