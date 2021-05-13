@@ -1,6 +1,7 @@
 *.o
 *.a
 resolve
+mocked-resolve
 .hypothesis
 __pycache__
 *.gcda
