@@ -3,7 +3,7 @@ CFLAGS=-Wall -O2 -g
 CC=gcc -std=c11 -D_POSIX_C_SOURCE=200809L
 
 resolve: resolve.c libdemes.a
-	$(CC) $(CFLAGS) resolve.c -o $@ -lyaml -L. -ldemes
+	$(CC) $(CFLAGS) resolve.c -o $@ -L. -ldemes -lyaml
 
 libdemes.a: demes.o unicodectype.o
 	$(AR) r $@ $^
@@ -51,5 +51,12 @@ memcheck-invalid: resolve
 pytest: resolve
 	pytest -n auto --hypothesis-show-statistics test.py
 
+coverage:
+	$(MAKE) clean
+	$(MAKE) CFLAGS="-Wall -O0 -g --coverage"
+	find examples -name "*.yaml" -exec ./resolve {} \; > /dev/null 2>&1
+	gcov -p *.c
+
 clean:
 	rm -f resolve libdemes.a *.o
+	rm -f *.gcda *.gcno *.gcov

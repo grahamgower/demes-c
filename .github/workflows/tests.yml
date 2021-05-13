@@ -1,0 +1,91 @@
+name: tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  canceller:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: cancel previous runs
+        uses: styfle/cancel-workflow-action@0.9.0
+        with:
+          access_token: ${{ github.token }}
+
+  compare-demes-python:
+    runs-on: ubuntu-18.04
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: install libyaml
+        run: sudo apt install libyaml-dev
+
+      - name: build
+        run: make
+
+      - name: setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: install test dependencies
+        run: |
+          pip install \
+            pytest \
+            pytest-xdist \
+            hypothesis \
+            git+https://github.com/popsim-consortium/demes-python.git
+
+      - name: run tests
+        run: make pytest
+
+  memcheck:
+    runs-on: ubuntu-18.04
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: install libyaml
+        run: sudo apt install libyaml-dev
+
+      - name: build
+        run: make
+
+      - name: install valgrind
+        run: sudo apt install valgrind
+
+      - name: memcheck good examples
+        run: make memcheck-valid
+
+      - name: memcheck bad examples
+        run: make memcheck-invalid
+
+  coverage:
+    runs-on: ubuntu-18.04
+    strategy:
+      fail-fast: false
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: install libyaml
+        run: sudo apt install libyaml-dev
+
+      - name: generate coverage report
+        run: make coverage
+
+      - name: upload coverage report to codecov
+        uses: codecov/codecov-action@v1
+        with:
+          fail_ci_if_error: true

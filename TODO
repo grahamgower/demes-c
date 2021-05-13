@@ -1,3 +1,4 @@
+* Improve code coverage.
 * Migration error messages indicate an index into the migrations list.
   But this may not correspond to the index into the migrations list in
   the input yaml file because symmetric migrations are resolved into pairs
@@ -8,7 +9,6 @@
 * Add function to validate existing graph. Useful for checking validity
   after modifying the graph, e.g. converting to generations, or rounding
   times or deme sizes to integer values.
-* Assess code coverage.
 * Check error messages all end with newlines \n.
 * Use more specific error codes throughout?
 * Return error messages up the call stack to the library's public functions
