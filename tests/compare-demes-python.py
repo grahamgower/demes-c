@@ -39,15 +39,14 @@ def test_random_graphs(graph):
     compare_resolvers(graph)
 
 
-def example_files():
-    example_dir = pathlib.Path("examples")
-    files = list(example_dir.glob("*.yaml"))
-    files += list((example_dir / "tutorial").glob("*.yaml"))
+def input_files():
+    input_dir = pathlib.Path("tests") / "input" / "valid"
+    files = list(input_dir.glob("*.yaml"))
     assert len(files) > 1
     return files
 
 
-@pytest.mark.parametrize("filename", example_files())
+@pytest.mark.parametrize("filename", input_files())
 def test_example_graphs(filename):
     graph = demes.load(filename)
     compare_resolvers(graph)
