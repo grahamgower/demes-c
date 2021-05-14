@@ -4,24 +4,13 @@
 #include <yaml.h>
 #include "demes.h"
 
-#ifdef MOCKFAIL
-#include "mockfail.c"
-#endif
-
 int
-main(int argc, char **argv)
+resolve(char *filename)
 {
     struct demes_graph *graph;
     int ret;
-
-    setlocale(LC_ALL, "");
-
-    if (argc != 2) {
-        printf("usage: %s model.yaml\n", argv[0]);
-        return 1;
-    }
-    if ((ret = demes_graph_load(argv[1], &graph))) {
-        fprintf(stderr, "failed while loading %s\n", argv[1]);
+    if ((ret = demes_graph_load(filename, &graph))) {
+        fprintf(stderr, "failed while loading %s\n", filename);
     }
     if (ret == 0) {
         if ((ret = demes_graph_dump(graph, stdout))) {
@@ -31,3 +20,19 @@ main(int argc, char **argv)
     demes_graph_free(graph);
     return ret;
 }
+
+#ifndef MOCKED_RESOLVE
+int
+main(int argc, char **argv)
+{
+    // Setting a locale is optional. libdemes works with any locale set.
+    setlocale(LC_ALL, "");
+
+    if (argc != 2) {
+        printf("usage: %s model.yaml\n", argv[0]);
+        return 1;
+    }
+
+    return resolve(argv[1]);
+}
+#endif

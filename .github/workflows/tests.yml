@@ -64,13 +64,10 @@ jobs:
       - name: install valgrind
         run: sudo apt install valgrind
 
-      - name: memcheck good examples
-        run: make memcheck-valid
+      - name: memcheck
+        run: make memcheck
 
-      - name: memcheck bad examples
-        run: make memcheck-invalid
-
-  coverage:
+  tests:
     runs-on: ubuntu-18.04
     strategy:
       fail-fast: false
@@ -82,8 +79,8 @@ jobs:
       - name: install libyaml
         run: sudo apt install libyaml-dev
 
-      - name: generate coverage report
-        run: make coverage
+      - name: run tests
+        run: make test
 
       - name: upload coverage report to codecov
         uses: codecov/codecov-action@v1
