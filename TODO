@@ -1,4 +1,3 @@
-* Improve code coverage.
 * Migration error messages indicate an index into the migrations list.
   But this may not correspond to the index into the migrations list in
   the input yaml file because symmetric migrations are resolved into pairs
@@ -11,6 +10,8 @@
   times or deme sizes to integer values.
 * Check error messages all end with newlines \n.
 * Use more specific error codes throughout?
+* Line numbers are zero-based, so every error message with a line number
+  needs to add 1.
 * Return error messages up the call stack to the library's public functions
   (demes_graph_load(), demes_graph_parse()), rather than printing to the
   terminal. This makes error propagation much messier, and we must be

@@ -4,5 +4,4 @@ demes:
   epochs:
   - {start_size: 100}
 migrations:
-- rate: 0
-  demes: []
+- {rate: 0.1, source: a, dest: b}
