@@ -284,6 +284,13 @@ demes_deme_add_epoch(
         goto err0;
     }
 
+    if (size_function == DEMES_SIZE_FUNCTION_CONSTANT && start_size != end_size) {
+        errmsg("deme %s: size_function is constant, but start_size != end_size\n",
+                deme->name);
+        ret = DEMES_ERR_VALUE;
+        goto err0;
+    }
+
     if (selfing_rate > 1.0 || selfing_rate < 0.0) {
         errmsg("deme %s: epochs[%zd]: must have 0 >= selfing_rate >= 0\n",
                 deme->name, deme->n_epochs);
@@ -529,46 +536,6 @@ time_intersection(
 }
 
 /**
- * Check if the two time intervals intersect.
- *
- * @return 1 if two time intervals intersect, 0 otherwise.
- */
-static int
-times_intersect(
-    double start_time1, double end_time1,
-    double start_time2, double end_time2)
-{
-    return !(end_time1 >= start_time2 || end_time2 >= start_time1);
-}
-
-/**
- * Check if any migrations with the same source and dest have overlapping
- * time intervals.
- *
- * @return 1 if there are overlapping migrations, 0 otherwise.
- */
-static int
-overlapping_migrations(
-    struct demes_graph *graph,
-    demes_char_t *source, demes_char_t *dest,
-    double start_time, double end_time)
-{
-    int i;
-
-    for (i=0; i<graph->n_migrations; i++) {
-        struct demes_migration *migration = graph->migrations + i;
-        if (!u8_strcmp(source, migration->source->name) &&
-            !u8_strcmp(dest, migration->dest->name) &&
-            times_intersect(migration->start_time, migration->end_time,
-                start_time, end_time)) {
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
-/**
  * Add an asymmetric migration to the @p graph.
  *
  * @return 0 upon success, or one of the DEMES_ERR_* error codes upon error.
@@ -632,18 +599,16 @@ demes_graph_add_migration(
         goto err0;
     }
 
-    if (rate < 0 || rate > 1) {
-        errmsg("migrations[%zd]: must have 0 >= rate >= 1\n",
+    if (end_time >= start_time) {
+        errmsg("migrations[%zd]: must have start_time > end_time\n",
                 graph->n_migrations);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
 
-    if (overlapping_migrations(graph, source, dest, start_time, end_time)) {
-        errmsg("migrations[%zd]: migrations already exist from source deme %s "
-                "to dest deme %s for the time interval "
-                "(start_time=%lf, end_time=%lf]\n",
-                graph->n_migrations, source, dest, start_time, end_time);
+    if (rate < 0 || rate > 1) {
+        errmsg("migrations[%zd]: must have 0 >= rate >= 1\n",
+                graph->n_migrations);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
@@ -762,8 +727,8 @@ demes_graph_add_pulse(
         goto err0;
     }
 
-    if (time > time_hi || time <= time_lo) {
-        errmsg("pulses[%zd]: must have %lf >= time > %lf, "
+    if (time > time_hi || time < time_lo) {
+        errmsg("pulses[%zd]: must have %lf >= time >= %lf, "
                 "as defined by the time-intersection of deme %s and deme %s\n",
                 graph->n_pulses, time_hi, time_lo, source, dest);
         ret = DEMES_ERR_VALUE;
@@ -780,6 +745,12 @@ demes_graph_add_pulse(
         errmsg("pulses[%zd]: invalid pulse at time %lf, which is source "
                 "deme %s's start_time\n",
                 graph->n_pulses, time, source);
+        ret = DEMES_ERR_VALUE;
+        goto err0;
+    }
+
+    if (proportion < 0 || proportion > 1) {
+        errmsg("pulses[%zd]: must have 0 >= proportion >= 1\n", graph->n_pulses);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
@@ -917,6 +888,11 @@ demes_graph_init(
     }
     graph->generation_time = NAN;
     if (!isnan(generation_time)) {
+        if (isinf(generation_time) || generation_time <= 0) {
+            errmsg("must have 0 > generation_time > infinity\n");
+            ret = DEMES_ERR_VALUE;
+            goto err0;
+        }
         graph->generation_time = generation_time;
     } else if (u8_strcmp(time_units, (demes_char_t *)"generations")) {
         errmsg("generation_time is a required field when time_units are not generations\n");
@@ -2331,12 +2307,13 @@ err0:
 }
 
 /**
- * Check that the sum of migration ingress rates don't exceed 1 for any deme.
+ * Check that the sum of migration ingress rates don't exceed 1 for any deme,
+ * and that there are no overlapping migrations.
  *
  * @return 0 upon success, or one of the DEMES_ERR_* error codes upon error.
  */
 static int
-check_migration_rates(struct demes_graph *graph)
+validate_migrations(struct demes_graph *graph)
 {
     int i, j, k;
     int ret = 0;
@@ -2494,7 +2471,7 @@ demes_graph_parse_migrations(
         }
     }
 
-    if ((ret = check_migration_rates(graph))) {
+    if ((ret = validate_migrations(graph))) {
         goto err1;
     }
 
@@ -2646,7 +2623,11 @@ demes_graph_parse(yaml_parser_t * parser, struct demes_graph **_graph)
         goto err2;
     }
 
-    root = yaml_document_get_root_node(&document);
+    if ((root = yaml_document_get_root_node(&document)) == NULL) {
+        ret = DEMES_ERR_YAML;
+        goto err3;
+    }
+
     if (root->type != YAML_MAPPING_NODE) {
         ret = DEMES_ERR_TYPE;
         goto err3;
