@@ -2247,10 +2247,23 @@ migration_matrices(
         }
     }
 
-    /* Ensure there's always 1 matrix, even when there are no migrations. */
+    // This function is called only when there are migrations.
+    assert(graph->n_migrations > 0);
+    /*
+    // Ensure there's always 1 matrix, even when there are no migrations.
     if (n_end_times == 0) {
-        insert_sorted_unique(0, &end_times, &n_end_times);
+        int k;
+        double youngest_end_time = INFINITY;
+        for (k=0; k<graph->n_demes) {
+            struct demes_deme *deme = graph->demes + k;
+            double end_time = deme->epochs[deme->n_epochs - 1].end_time;
+            if (end_time < youngest_time) {
+                youngest_end_time = end_time;
+            }
+        }
+        insert_sorted_unique(youngest_end_time, &end_times, &n_end_times);
     }
+    */
 
     nmemb = n_end_times * graph->n_demes * graph->n_demes;
     if ((mm_list = calloc(nmemb, sizeof *mm_list)) == NULL) {
@@ -2790,11 +2803,12 @@ double_to_string(char *buf, size_t buflen, double num)
     assert(!isnan(num));
 
     if (isinf(num)) {
+        assert(num > 0); // negative infinity is not valid in any field
         if (num > 0) {
             snprintf(buf, buflen, ".inf");
-        } else {
+        } /* else {
             snprintf(buf, buflen, "-.inf");
-        }
+        } */
     } else {
         /* Output sufficiently many digits to safely round-trip the
          * number. I.e., if we read the emitted YAML back in, we should
@@ -3122,6 +3136,8 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
                 goto err3;
             }
 
+            assert(epoch->size_function == DEMES_SIZE_FUNCTION_CONSTANT ||
+                   epoch->size_function == DEMES_SIZE_FUNCTION_EXPONENTIAL);
             if (epoch->size_function == DEMES_SIZE_FUNCTION_CONSTANT) {
                 if ((ret = append_mapping_string(&document, epoch_node,
                                 "size_function", (demes_char_t*)"constant", 0))) {
@@ -3134,11 +3150,11 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
                     ret = DEMES_ERR_YAML;
                     goto err3;
                 }
-            } else {
+            } /* else {
                 errmsg("unknown size_function: %d\n", epoch->size_function);
                 ret = DEMES_ERR_VALUE;
                 goto err3;
-            }
+            } */
 
             if ((ret = append_mapping_number(&document, epoch_node, "selfing_rate",
                             epoch->selfing_rate))) {
