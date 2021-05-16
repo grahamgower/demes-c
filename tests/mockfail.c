@@ -21,6 +21,8 @@ static int (*__real_yaml_document_append_mapping_pair)(
         yaml_document_t *, int, int, int) = NULL;
 static int (*__real_yaml_document_append_sequence_item)(
         yaml_document_t *, int, int) = NULL;
+static int (*__real_yaml_emitter_open)(yaml_emitter_t *) = NULL;
+static int (*__real_yaml_emitter_close)(yaml_emitter_t *) = NULL;
 
 size_t fail_after = -1;
 size_t counter = 0;
@@ -59,6 +61,14 @@ mockinit()
                     RTLD_NEXT, "yaml_document_append_sequence_item"))) {
         fprintf(stderr, "mockfail: dlsym: yaml_document_append_sequence_item: %s\n",
                 dlerror());
+        abort();
+    }
+    if (!(__real_yaml_emitter_open = dlsym(RTLD_NEXT, "yaml_emitter_open"))) {
+        fprintf(stderr, "mockfail: dlsym: yaml_emitter_open: %s\n", dlerror());
+        abort();
+    }
+    if (!(__real_yaml_emitter_close = dlsym(RTLD_NEXT, "yaml_emitter_close"))) {
+        fprintf(stderr, "mockfail: dlsym: yaml_emitter_close: %s\n", dlerror());
         abort();
     }
 }
@@ -142,5 +152,25 @@ yaml_document_append_sequence_item(
         return 0;
     } else {
         return __real_yaml_document_append_sequence_item(document, sequence, item);
+    }
+}
+
+int
+yaml_emitter_open(yaml_emitter_t *emitter)
+{
+    if (++counter > fail_after) {
+        return 0;
+    } else {
+        return __real_yaml_emitter_open(emitter);
+    }
+}
+
+int
+yaml_emitter_close(yaml_emitter_t *emitter)
+{
+    if (++counter > fail_after) {
+        return 0;
+    } else {
+        return __real_yaml_emitter_close(emitter);
     }
 }
