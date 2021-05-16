@@ -8,12 +8,19 @@
 #include <stdlib.h>
 #include <locale.h>
 #include <errno.h>
+#include "yaml.h"
 
+// libc
 static void *(*__real_malloc)(size_t) = NULL;
 static void *(*__real_realloc)(void *, size_t) = NULL;
 static void *(*__real_calloc)(size_t, size_t) = NULL;
 static locale_t (*__real_newlocale)(int, const char *, locale_t) = NULL;
 static locale_t (*__real_uselocale)(locale_t) = NULL;
+// libyaml
+static int (*__real_yaml_document_append_mapping_pair)(
+        yaml_document_t *, int, int, int) = NULL;
+static int (*__real_yaml_document_append_sequence_item)(
+        yaml_document_t *, int, int) = NULL;
 
 size_t fail_after = -1;
 size_t counter = 0;
@@ -40,6 +47,18 @@ mockinit()
     }
     if (!(__real_uselocale = dlsym(RTLD_NEXT, "uselocale"))) {
         fprintf(stderr, "mockfail: dlsym: uselocale: %s\n", dlerror());
+        abort();
+    }
+    if (!(__real_yaml_document_append_mapping_pair = dlsym(
+                    RTLD_NEXT, "yaml_document_append_mapping_pair"))) {
+        fprintf(stderr, "mockfail: dlsym: yaml_document_append_mapping_pair: %s\n",
+                dlerror());
+        abort();
+    }
+    if (!(__real_yaml_document_append_sequence_item = dlsym(
+                    RTLD_NEXT, "yaml_document_append_sequence_item"))) {
+        fprintf(stderr, "mockfail: dlsym: yaml_document_append_sequence_item: %s\n",
+                dlerror());
         abort();
     }
 }
@@ -96,5 +115,32 @@ uselocale(locale_t newloc)
         return (locale_t)0;
     } else {
         return __real_uselocale(newloc);
+    }
+}
+
+int
+yaml_document_append_mapping_pair(
+        yaml_document_t *document,
+        int mapping, int key, int value)
+{
+    if (++counter > fail_after) {
+        errno = ENOMEM;
+        return 0;
+    } else {
+        return __real_yaml_document_append_mapping_pair(
+                document, mapping, key, value);
+    }
+}
+
+int
+yaml_document_append_sequence_item(
+        yaml_document_t *document,
+        int sequence, int item)
+{
+    if (++counter > fail_after) {
+        errno = ENOMEM;
+        return 0;
+    } else {
+        return __real_yaml_document_append_sequence_item(document, sequence, item);
     }
 }
