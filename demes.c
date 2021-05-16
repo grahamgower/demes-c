@@ -2397,6 +2397,10 @@ demes_graph_parse_migrations(
             goto err1;
         }
 
+        if ((ret = check_allowed_migration(document, migration))) {
+            goto err1;
+        }
+
         demes = toplevel_defaults->migration.demes;
         n_demes = toplevel_defaults->migration.n_demes;
         source = toplevel_defaults->migration.source;
@@ -2522,6 +2526,10 @@ demes_graph_parse_pulses(
             errmsg("line %ld: pulse[%d]: expected a pulse object\n",
                     pulse->start_mark.line, i);
             ret = DEMES_ERR_TYPE;
+            goto err0;
+        }
+
+        if ((ret = check_allowed_pulse(document, pulse))) {
             goto err0;
         }
 
