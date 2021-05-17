@@ -975,7 +975,11 @@ get_string(
     value = get_value(document, node, key_name);
     if (value) {
         if (value->type == YAML_SCALAR_NODE) {
-            *string = value->data.scalar.value;
+            if (!u8_strcmp(value->data.scalar.value, (demes_char_t*)"null")) {
+                // null here means no string (i.e. NULL)
+            } else {
+                *string = value->data.scalar.value;
+            }
         } else {
             errmsg("line %ld: %s: expected a string\n",
                     value->start_mark.line, key_name);
@@ -1007,7 +1011,11 @@ get_string_list(
 
     list = get_value(document, node, key_name);
     if (list) {
-        if (list->type != YAML_SEQUENCE_NODE) {
+        if (list->type == YAML_SCALAR_NODE &&
+                !u8_strcmp(list->data.scalar.value, (demes_char_t*)"null")) {
+            // null here means no list (i.e. an empty list)
+            goto done;
+        } else if (list->type != YAML_SEQUENCE_NODE) {
             errmsg("line %ld: %s: expected a list\n",
                     list->start_mark.line, key_name);
             ret = DEMES_ERR_TYPE;
@@ -1041,6 +1049,7 @@ get_string_list(
     *_strings = strings;
     *_length = length;
 
+done:
 err1:
     if (ret && strings) {
         free(strings);
@@ -1075,10 +1084,13 @@ parse_number(char *string)
         } else if (string && string[0] == '+') {
             string++;
         }
-        if (!strcmp(string, ".inf") || !strcmp(string, ".Inf") || !strcmp(string, ".INF")) {
+        if (!strcmp(string, ".inf") || !strcmp(string, ".Inf") ||
+                !strcmp(string, ".INF")) {
             number = sign * INFINITY;
         } else {
-            /* no number to convert or trailing garbage */
+            /* No number to convert or trailing garbage.
+             * The special value "null" will also be interpreted as NAN.
+             */
             number = NAN;
         }
     }
@@ -1136,7 +1148,11 @@ get_number_list(
 
     list = get_value(document, node, key_name);
     if (list) {
-        if (list->type != YAML_SEQUENCE_NODE) {
+        if (list->type == YAML_SCALAR_NODE &&
+                !u8_strcmp(list->data.scalar.value, (demes_char_t*)"null")) {
+            // null here means no list (i.e. an empty list)
+            goto done;
+        } else if (list->type != YAML_SEQUENCE_NODE) {
             errmsg("line %ld: %s: expected a list\n",
                     list->start_mark.line, key_name);
             ret = DEMES_ERR_TYPE;
@@ -1170,6 +1186,7 @@ get_number_list(
     *_numbers = numbers;
     *_length = length;
 
+done:
 err1:
     if (ret && numbers) {
         free(numbers);
@@ -2247,23 +2264,19 @@ migration_matrices(
         }
     }
 
-    // This function is called only when there are migrations.
-    assert(graph->n_migrations > 0);
-    /*
     // Ensure there's always 1 matrix, even when there are no migrations.
     if (n_end_times == 0) {
         int k;
         double youngest_end_time = INFINITY;
-        for (k=0; k<graph->n_demes) {
+        for (k=0; k<graph->n_demes; k++) {
             struct demes_deme *deme = graph->demes + k;
             double end_time = deme->epochs[deme->n_epochs - 1].end_time;
-            if (end_time < youngest_time) {
+            if (end_time < youngest_end_time) {
                 youngest_end_time = end_time;
             }
         }
         insert_sorted_unique(youngest_end_time, &end_times, &n_end_times);
     }
-    */
 
     nmemb = n_end_times * graph->n_demes * graph->n_demes;
     if ((mm_list = calloc(nmemb, sizeof *mm_list)) == NULL) {

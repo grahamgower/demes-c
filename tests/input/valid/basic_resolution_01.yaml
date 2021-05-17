@@ -1,4 +1,5 @@
 time_units: generations
 demes:
 - name: a
-  epochs: []
+  epochs:
+  - {start_size: 1}

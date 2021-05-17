@@ -20,23 +20,19 @@ def resolve(filename: str) -> str:
             return f.read()
 
 
-def compare_resolvers(graph1):
-    with tempfile.TemporaryDirectory() as tmpdir:
-        infile = pathlib.Path(tmpdir) / "in.yaml"
-        demes.dump(graph1, infile)
-        outstring = resolve(infile)
-        graph2 = demes.loads(outstring)
-        graph1.assert_close(graph2)
-
-
 @hyp.settings(
     max_examples=1000,
     deadline=None,
     suppress_health_check=[hyp.HealthCheck.too_slow, hyp.HealthCheck.filter_too_much],
 )
 @hyp.given(demes.hypothesis_strategies.graphs())
-def test_random_graphs(graph):
-    compare_resolvers(graph)
+def test_random_graphs(graph1):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        infile = pathlib.Path(tmpdir) / "in.yaml"
+        demes.dump(graph1, infile)
+        outstring = resolve(infile)
+        graph2 = demes.loads(outstring)
+        graph1.assert_close(graph2)
 
 
 def input_files():
@@ -48,5 +44,6 @@ def input_files():
 
 @pytest.mark.parametrize("filename", input_files())
 def test_example_graphs(filename):
-    graph = demes.load(filename)
-    compare_resolvers(graph)
+    graph1 = demes.load(filename)
+    outstring = resolve(filename)
+    graph2 = demes.loads(outstring)
