@@ -58,6 +58,11 @@ mocked_resolve() {
 }
 export -f mocked_resolve
 
+$RESOLVE >/dev/null 2>&1 \
+    && die "resolver succeeded, despite no input file"
+$MOCKED_RESOLVE >/dev/null 2>&1 \
+    && die "mocked resolver succeeded, despite no input file"
+
 find input/valid -name \*.yaml -print0 \
     | xargs -0 -n1 bash -c 'resolve "$@"' bash \
     || exit 1

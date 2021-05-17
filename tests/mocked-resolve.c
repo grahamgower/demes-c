@@ -16,7 +16,7 @@ main(int argc, char **argv)
     setlocale(LC_ALL, "");
 
     if (argc != 2) {
-        printf("usage: %s model.yaml\n", argv[0]);
+        fprintf(stderr, "usage: %s model.yaml\n", argv[0]);
         return -1;
     }
 
