@@ -2247,23 +2247,19 @@ migration_matrices(
         }
     }
 
-    // This function is called only when there are migrations.
-    assert(graph->n_migrations > 0);
-    /*
     // Ensure there's always 1 matrix, even when there are no migrations.
     if (n_end_times == 0) {
         int k;
         double youngest_end_time = INFINITY;
-        for (k=0; k<graph->n_demes) {
+        for (k=0; k<graph->n_demes; k++) {
             struct demes_deme *deme = graph->demes + k;
             double end_time = deme->epochs[deme->n_epochs - 1].end_time;
-            if (end_time < youngest_time) {
+            if (end_time < youngest_end_time) {
                 youngest_end_time = end_time;
             }
         }
         insert_sorted_unique(youngest_end_time, &end_times, &n_end_times);
     }
-    */
 
     nmemb = n_end_times * graph->n_demes * graph->n_demes;
     if ((mm_list = calloc(nmemb, sizeof *mm_list)) == NULL) {
