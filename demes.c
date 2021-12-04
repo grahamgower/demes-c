@@ -2999,7 +2999,7 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
         goto err1;
     }
 
-    if (yaml_document_initialize(&document, NULL, NULL, NULL, 0, 0) == 0) {
+    if (yaml_document_initialize(&document, NULL, NULL, NULL, 1, 1) == 0) {
         errmsg("libyaml failed to initialise document\n");
         ret = DEMES_ERR_YAML;
         goto err2;
