@@ -2829,7 +2829,7 @@ double_to_string(char *buf, size_t buflen, double num)
          * precision, so the value may differ in other parsers,
          * but at least we'll get consistency for testing.
          */
-        snprintf(buf, buflen, "%.*lg", DBL_DECIMAL_DIG, num);
+        snprintf(buf, buflen, "%.*lg", DBL_DECIMAL_DIG - 1, num);
     }
 }
 
