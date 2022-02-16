@@ -63,22 +63,22 @@ $RESOLVE >/dev/null 2>&1 \
 $MOCKED_RESOLVE >/dev/null 2>&1 \
     && die "mocked resolver succeeded, despite no input file"
 
-find input/valid -name \*.yaml -print0 \
+find test-cases/valid -name \*.yaml -print0 \
     | xargs -0 -n1 bash -c 'resolve "$@"' bash \
     || exit 1
 
-find input/valid -name \*.yaml -print0 \
+find test-cases/valid -name \*.yaml -print0 \
     | xargs -0 -n1 bash -c 'idempotent "$@"' bash \
     || exit 1
 
-find input/valid -name \*.yaml -print0 \
+find test-cases/valid -name \*.yaml -print0 \
     | xargs -0 -n1 bash -c 'locale_independent "$@"' bash \
     || exit 1
 
-find input/invalid -name \*.yaml -print0 \
+find test-cases/invalid -name \*.yaml -print0 \
     | xargs -0 -n1 bash -c 'assert_failure "$@"' bash \
     || exit 1
 
-find input/valid -name \*.yaml -print0 \
+find test-cases/valid -name \*.yaml -print0 \
     | xargs -0 -n1 bash -c 'mocked_resolve "$@"' bash \
     || exit 1
