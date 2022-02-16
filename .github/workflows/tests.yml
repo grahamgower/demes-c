@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - name: install libyaml
         run: sudo apt install libyaml-dev
@@ -54,6 +56,8 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - name: install libyaml
         run: sudo apt install libyaml-dev
@@ -75,6 +79,8 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - name: install libyaml
         run: sudo apt install libyaml-dev
