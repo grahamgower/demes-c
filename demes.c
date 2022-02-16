@@ -2583,7 +2583,7 @@ err0:
 }
 
 /**
- * Parse the pulses node (@p migrations) in the yaml @p document,
+ * Parse the pulses node (@p pulses) in the yaml @p document,
  * populating @p toplevel_defaults->pulse.
  *
  * @return 0 upon success, or one of the DEMES_ERR_* error codes upon error.
@@ -2713,11 +2713,36 @@ err0:
     return ret;
 }
 
+/**
+ * Parse the toplevel metadata node (@p metadata) in the yaml @p document.
+ * TODO: store the metadata, so we can at least round-trip it.
+ *
+ * @return 0 upon success, or one of the DEMES_ERR_* error codes upon error.
+ */
+static int
+demes_graph_parse_toplevel_metadata(
+    yaml_document_t *document,
+    struct demes_graph *graph,
+    yaml_node_t *metadata)
+{
+    int ret = 0;
+
+    if (metadata->type != YAML_MAPPING_NODE) {
+        errmsg("line %ld: metadata must be a mapping of key/value pairs\n",
+                metadata->start_mark.line);
+        ret = DEMES_ERR_TYPE;
+        goto err0;
+    }
+
+err0:
+    return ret;
+}
+
 int
 demes_graph_parse(yaml_parser_t * parser, struct demes_graph **_graph)
 {
     yaml_document_t document;
-    yaml_node_t *root, *demes, *migrations, *pulses;
+    yaml_node_t *root, *demes, *migrations, *pulses, *metadata;
     struct demes_graph *graph;
     struct toplevel_defaults toplevel_defaults;
     int ret = 0;
@@ -2808,6 +2833,12 @@ demes_graph_parse(yaml_parser_t * parser, struct demes_graph **_graph)
     if ((pulses = get_value(&document, root, "pulses"))) {
         if ((ret = demes_graph_parse_pulses(
                         &document, graph, pulses, &toplevel_defaults))) {
+            goto err5;
+        }
+    }
+
+    if ((metadata = get_value(&document, root, "metadata"))) {
+        if ((ret = demes_graph_parse_toplevel_metadata(&document, graph, metadata))) {
             goto err5;
         }
     }
