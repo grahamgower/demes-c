@@ -1308,7 +1308,7 @@ check_allowed_toplevel(yaml_document_t *document, yaml_node_t *node)
 {
     static char *allowed[] = {
         "description", "time_units", "generation_time", "doi", "demes",
-        "migrations", "pulses", "defaults"
+        "migrations", "pulses", "defaults", "metadata"
     };
     size_t len = sizeof(allowed) / sizeof(allowed[0]);
     return check_allowed_mapping(document, node, (demes_char_t **)allowed, len);
