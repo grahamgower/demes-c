@@ -43,8 +43,12 @@ export -f locale_independent
 assert_failure() {
     yaml=$1
     $RESOLVE $yaml > /dev/null 2>&1
-    if [ $? = 0 ]; then
+    ret=$?
+    if [ $ret = 0 ]; then
         die "$yaml: failed to reject invalid model"
+    fi
+    if [ $ret -gt 128 ]; then
+        die "$yaml: resolver exited abnormally"
     fi
 }
 export -f assert_failure
