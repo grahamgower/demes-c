@@ -60,10 +60,12 @@ struct toplevel_defaults {
      * deme names here.
      */
     struct toplevel_defaults_pulse {
-        demes_char_t *source;
+        demes_char_t **sources;
         demes_char_t *dest;
         double time;
-        double proportion;
+        double *proportions;
+        size_t n_sources;
+        size_t n_proportions;
     } pulse;
 };
 
@@ -448,7 +450,8 @@ demes_graph_add_deme(
         if (n_proportions > 0) {
             double sum = 0;
             for (i=0; i<n_proportions; i++) {
-                if (proportions[i] < 0 || proportions[i] > 1) {
+                if (isnan(proportions[i]) || proportions[i] < 0
+                        || proportions[i] > 1) {
                     errmsg("deme %s: must have 0 >= p >= 1 for each proportion p\n",
                             name);
                     ret = DEMES_ERR_PROPORTIONS;
@@ -689,8 +692,8 @@ err0:
  */
 static int
 demes_graph_add_pulse(
-    struct demes_graph *graph, demes_char_t *source, demes_char_t *dest,
-    double time, double proportion)
+    struct demes_graph *graph, demes_char_t **sources, size_t n_sources,
+    demes_char_t *dest, double time, double *proportions, size_t n_proportions)
 {
     struct demes_pulse *pulses, *pulse;
     struct demes_deme *source_deme, *dest_deme;
@@ -698,73 +701,98 @@ demes_graph_add_pulse(
     double sum;
     size_t size;
     int ret = 0;
-    int i;
+    int i, j;
 
-    if ((source_deme = demes_graph_get_deme(graph, source)) == NULL) {
-        errmsg("pulses[%zd]: deme '%s' not in graph\n",
-                graph->n_pulses, source);
+    if (n_sources == 0) {
+        errmsg("pulses[%zd]: must specify at least one source deme\n",
+                graph->n_pulses);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
+
+    if (n_sources != n_proportions) {
+        errmsg("pulses[%zd]: sources list and proportions list don't match\n",
+                graph->n_pulses);
+        ret = DEMES_ERR_PROPORTIONS;
+        goto err0;
+    }
+
+    assert(sources && n_sources > 0);
+    assert(proportions && n_proportions > 0);
+
     if ((dest_deme = demes_graph_get_deme(graph, dest)) == NULL) {
         errmsg("pulses[%zd]: deme '%s' not in graph\n",
                 graph->n_pulses, dest);
         ret = DEMES_ERR_VALUE;
         goto err0;
     }
-    if (source_deme == dest_deme) {
-        errmsg("pulses[%zd]: source and dest cannot be the same deme\n",
-                graph->n_pulses);
-        ret = DEMES_ERR_VALUE;
-        goto err0;
-    }
 
-    time_intersection(source_deme, dest_deme, &time_hi, &time_lo);
-    if (time_hi <= time_lo) {
-        errmsg("pulses[%zd]: deme %s and deme %s never coexist\n",
-                graph->n_pulses, source, dest);
-        ret = DEMES_ERR_VALUE;
-        goto err0;
-    }
+    for (i=0; i<n_sources; i++) {
+        if ((source_deme = demes_graph_get_deme(graph, sources[i])) == NULL) {
+            errmsg("pulses[%zd]: source deme '%s' not in graph\n",
+                    graph->n_pulses, sources[i]);
+            ret = DEMES_ERR_VALUE;
+            goto err0;
+        }
+        if (source_deme == dest_deme) {
+            errmsg("pulses[%zd]: source and dest cannot be the same deme\n",
+                    graph->n_pulses);
+            ret = DEMES_ERR_VALUE;
+            goto err0;
+        }
 
-    if (time > time_hi || time < time_lo) {
-        errmsg("pulses[%zd]: must have %lf >= time >= %lf, "
-                "as defined by the time-intersection of deme %s and deme %s\n",
-                graph->n_pulses, time_hi, time_lo, source, dest);
-        ret = DEMES_ERR_VALUE;
-        goto err0;
-    }
-    if (time == dest_deme->epochs[dest_deme->n_epochs - 1].end_time) {
-        errmsg("pulses[%zd]: invalid pulse at time %lf, which is dest "
-                "deme %s's end_time\n",
-                graph->n_pulses, time, dest);
-        ret = DEMES_ERR_VALUE;
-        goto err0;
-    }
-    if (time == source_deme->start_time) {
-        errmsg("pulses[%zd]: invalid pulse at time %lf, which is source "
-                "deme %s's start_time\n",
-                graph->n_pulses, time, source);
-        ret = DEMES_ERR_VALUE;
-        goto err0;
-    }
+        time_intersection(source_deme, dest_deme, &time_hi, &time_lo);
+        if (time_hi <= time_lo) {
+            errmsg("pulses[%zd]: deme %s and deme %s never coexist\n",
+                    graph->n_pulses, sources[i], dest);
+            ret = DEMES_ERR_VALUE;
+            goto err0;
+        }
 
-    if (proportion < 0 || proportion > 1) {
-        errmsg("pulses[%zd]: must have 0 >= proportion >= 1\n", graph->n_pulses);
-        ret = DEMES_ERR_VALUE;
-        goto err0;
+        if (time > time_hi || time < time_lo) {
+            errmsg("pulses[%zd]: must have %lf >= time >= %lf, "
+                    "as defined by the time-intersection of deme %s and deme %s\n",
+                    graph->n_pulses, time_hi, time_lo, sources[i], dest);
+            ret = DEMES_ERR_VALUE;
+            goto err0;
+        }
+        if (time == dest_deme->epochs[dest_deme->n_epochs - 1].end_time) {
+            errmsg("pulses[%zd]: invalid pulse at time %lf, which is dest "
+                    "deme %s's end_time\n",
+                    graph->n_pulses, time, dest);
+            ret = DEMES_ERR_VALUE;
+            goto err0;
+        }
+        if (time == source_deme->start_time) {
+            errmsg("pulses[%zd]: invalid pulse at time %lf, which is source "
+                    "deme %s's start_time\n",
+                    graph->n_pulses, time, sources[i]);
+            ret = DEMES_ERR_VALUE;
+            goto err0;
+        }
+
+        for (j=0; j<i; j++) {
+            if (!u8_strcmp(sources[i], sources[j])) {
+                errmsg("pulses[%zd]: duplicate source '%s'\n",
+                        graph->n_pulses, sources[i]);
+                ret = DEMES_ERR_VALUE;
+                goto err0;
+            }
+        }
     }
 
     /*
-     * Check for multiple pulses into dest at the same time that
-     * give a sum of proportions > 1.
+     * Check sum of proportions <= 1.
      */
-    sum = proportion;
-    for (i=0; i<graph->n_pulses; i++) {
-        struct demes_pulse *pulse = graph->pulses + i;
-        if (!u8_strcmp(pulse->dest->name, dest) && pulse->time == time) {
-            sum += pulse->proportion;
+    sum = 0;
+    for (i=0; i<n_proportions; i++) {
+        if (isnan(proportions[i]) || proportions[i] < 0 || proportions[i] > 1) {
+            errmsg("pulses[%zd]: must have 0 >= p >= 1 for each proportion p\n",
+                    graph->n_pulses);
+            ret = DEMES_ERR_PROPORTIONS;
+            goto err0;
         }
+        sum += proportions[i];
     }
     if (sum > 1.0) {
         errmsg("pulses[%zd]: sum of pulse proportions > 1 for dest deme %s "
@@ -784,10 +812,29 @@ demes_graph_add_pulse(
     graph->pulses = pulses;
     graph->n_pulses++;
     pulse = &pulses[graph->n_pulses - 1];
-    pulse->source = source_deme;
+    pulse->sources = NULL;
     pulse->dest = dest_deme;
     pulse->time = time;
-    pulse->proportion = proportion;
+    pulse->proportions = NULL;
+    pulse->n_sources = n_sources;
+
+    pulse->sources = calloc(n_sources, sizeof *pulse->sources);
+    if (pulse->sources == NULL) {
+        perror("calloc");
+        ret = DEMES_ERR_MEMORY;
+        goto err0;
+    }
+    pulse->proportions = calloc(n_proportions, sizeof *pulse->proportions);
+    if (pulse->proportions  == NULL) {
+        perror("calloc");
+        ret = DEMES_ERR_MEMORY;
+        goto err0;
+    }
+
+    for (i=0; i<n_sources; i++) {
+        *(pulse->sources + i) = demes_graph_get_deme(graph, sources[i]);
+        *(pulse->proportions + i) = proportions[i];
+    }
 
 err0:
     return ret;
@@ -843,6 +890,15 @@ demes_graph_free(struct demes_graph *graph)
         free(graph->migrations);
     }
     if (graph->pulses) {
+        for (i=0; i<graph->n_pulses; i++) {
+            struct demes_pulse *pulse = &graph->pulses[i];
+            if (pulse->sources) {
+                free(pulse->sources);
+            }
+            if (pulse->proportions) {
+                free(pulse->proportions);
+            }
+        }
         free(graph->pulses);
     }
 
@@ -1320,7 +1376,7 @@ static int
 check_allowed_pulse(yaml_document_t *document, yaml_node_t *node)
 {
     static char *allowed[] = {
-        "source", "dest", "time", "proportion",
+        "sources", "dest", "time", "proportions",
     };
     size_t len = sizeof(allowed) / sizeof(allowed[0]);
     return check_allowed_mapping(document, node, (demes_char_t **)allowed, len);
@@ -1667,7 +1723,8 @@ demes_graph_parse_defaults_deme(
             int i;
             double sum = 0;
             for (i=0; i<deme->n_proportions; i++) {
-                if (deme->proportions[i] < 0 || deme->proportions[i] > 1) {
+                if (isnan(deme->proportions[i]) || deme->proportions[i] < 0
+                        || deme->proportions[i] > 1) {
                     yaml_node_t *key = get_value(document, deme_node, "proportions");
                     errmsg("line %ld: must have 0 >= p >= 1 for each proportion p\n",
                             key->start_mark.line);
@@ -1785,7 +1842,8 @@ demes_graph_parse_defaults_pulse(
             goto err0;
         }
 
-        if ((ret = get_string(document, pulse_node, "source", &pulse->source))) {
+        if ((ret = get_string_list(document, pulse_node, "sources",
+                        &pulse->sources, &pulse->n_sources))) {
             goto err0;
         }
         if ((ret = get_string(document, pulse_node, "dest", &pulse->dest))) {
@@ -1802,16 +1860,31 @@ demes_graph_parse_defaults_pulse(
             goto err0;
         }
 
-        if ((ret = get_number(document, pulse_node, "proportion",
-                        &pulse->proportion))) {
+        if ((ret = get_number_list(document, pulse_node, "proportions",
+                        &pulse->proportions, &pulse->n_proportions))) {
             goto err0;
         }
-        if (!isnan(pulse->proportion) &&
-                (pulse->proportion < 0 || pulse->proportion > 1)) {
-            yaml_node_t *key = get_value(document, pulse_node, "proportion");
-            errmsg("line %ld: must have 0 <= proportion <= 1\n", key->start_mark.line);
-            ret = DEMES_ERR_VALUE;
-            goto err0;
+        if (pulse->proportions != NULL) {
+            int i;
+            double sum = 0;
+            for (i=0; i<pulse->n_proportions; i++) {
+                if (isnan(pulse->proportions[i]) || pulse->proportions[i] < 0
+                        || pulse->proportions[i] > 1) {
+                    yaml_node_t *key = get_value(document, pulse_node, "proportions");
+                    errmsg("line %ld: must have 0 <= p <= 1 for all proportions p\n",
+                            key->start_mark.line);
+                    ret = DEMES_ERR_PROPORTIONS;
+                    goto err0;
+                }
+                sum += pulse->proportions[i];
+            }
+            if (sum > 1) {
+                    yaml_node_t *key = get_value(document, pulse_node, "proportions");
+                    errmsg("line %ld: proportions must sum to <= 1\n",
+                            key->start_mark.line);
+                    ret = DEMES_ERR_PROPORTIONS;
+                    goto err0;
+            }
         }
     }
 
@@ -1857,10 +1930,12 @@ init_toplevel_defaults(struct toplevel_defaults *defaults)
     defaults->migration.end_time = NAN;
     defaults->migration.rate = NAN;
 
-    defaults->pulse.source = NULL;
+    defaults->pulse.sources = NULL;
     defaults->pulse.dest = NULL;
     defaults->pulse.time = NAN;
-    defaults->pulse.proportion = NAN;
+    defaults->pulse.proportions = NULL;
+    defaults->pulse.n_sources = 0;
+    defaults->pulse.n_proportions = 0;
 }
 
 /**
@@ -1978,6 +2053,12 @@ free_toplevel_defaults(struct toplevel_defaults *toplevel_defaults)
     }
     if (toplevel_defaults->migration.demes) {
         free(toplevel_defaults->migration.demes);
+    }
+    if (toplevel_defaults->pulse.sources) {
+        free(toplevel_defaults->pulse.sources);
+    }
+    if (toplevel_defaults->pulse.proportions) {
+        free(toplevel_defaults->pulse.proportions);
     }
 }
 
@@ -2144,11 +2225,9 @@ demes_graph_parse_demes(
 err0:
     if (ancestors && ancestors != toplevel_defaults->deme.ancestors) {
         free(ancestors);
-        ancestors = NULL;
     }
     if (proportions && proportions != toplevel_defaults->deme.proportions) {
         free(proportions);
-        proportions = NULL;
     }
     return ret;
 }
@@ -2526,6 +2605,8 @@ demes_graph_parse_pulses(
     yaml_node_t *pulses,
     struct toplevel_defaults *toplevel_defaults)
 {
+    demes_char_t **sources = NULL;
+    double *proportions = NULL;
     int n_pulses;
     int ret = 0;
     int i;
@@ -2541,8 +2622,9 @@ demes_graph_parse_pulses(
 
     for (i=0; i<n_pulses; i++) {
         yaml_node_t *pulse;
-        demes_char_t *source, *dest;
-        double time, proportion;
+        demes_char_t *dest;
+        double time;
+        size_t n_sources, n_proportions;
 
         pulse = yaml_document_get_node(
                 document, pulses->data.sequence.items.start[i]);
@@ -2559,18 +2641,21 @@ demes_graph_parse_pulses(
             goto err0;
         }
 
-        source = toplevel_defaults->pulse.source;
+        sources = toplevel_defaults->pulse.sources;
+        n_sources = toplevel_defaults->pulse.n_sources;
         dest = toplevel_defaults->pulse.dest;
         time = toplevel_defaults->pulse.time;
-        proportion = toplevel_defaults->pulse.proportion;
+        proportions = toplevel_defaults->pulse.proportions;
+        n_proportions = toplevel_defaults->pulse.n_proportions;
 
-        if (get_value(document, pulse, "source")) {
-            if ((ret = get_string(document, pulse, "source", &source))) {
+        if (get_value(document, pulse, "sources")) {
+            if ((ret = get_string_list(document, pulse, "sources", &sources,
+                            &n_sources))) {
                 goto err0;
             }
         }
-        if (source == NULL) {
-            errmsg("line %ld: pulse[%d]: required field 'source' not found\n",
+        if (sources == NULL) {
+            errmsg("line %ld: pulse[%d]: required field 'sources' not found\n",
                     pulse->start_mark.line, i);
             ret = DEMES_ERR_MISSING_REQUIRED;
             goto err0;
@@ -2600,24 +2685,41 @@ demes_graph_parse_pulses(
             goto err0;
         }
 
-        if (get_value(document, pulse, "proportion")) {
-            if ((ret = get_number(document, pulse, "proportion", &proportion))) {
+        if (get_value(document, pulse, "proportions")) {
+            if ((ret = get_number_list(document, pulse, "proportions",
+                            &proportions, &n_proportions))) {
                 goto err0;
             }
         }
-        if (isnan(proportion)) {
-            errmsg("line %ld: pulse[%d]: required field 'proportion' not found\n",
+        if (proportions == NULL) {
+            errmsg("line %ld: pulse[%d]: required field 'proportions' not found\n",
                     pulse->start_mark.line, i);
             ret = DEMES_ERR_MISSING_REQUIRED;
             goto err0;
         }
 
-        if ((ret = demes_graph_add_pulse(graph, source, dest, time, proportion))) {
+        if ((ret = demes_graph_add_pulse(graph, sources, n_sources, dest, time,
+                        proportions, n_proportions))) {
             goto err0;
+        }
+
+        if (sources && sources != toplevel_defaults->pulse.sources) {
+            free(sources);
+            sources = NULL;
+        }
+        if (proportions && proportions != toplevel_defaults->pulse.proportions) {
+            free(proportions);
+            proportions = NULL;
         }
     }
 
 err0:
+    if (sources && sources != toplevel_defaults->pulse.sources) {
+        free(sources);
+    }
+    if (proportions && proportions != toplevel_defaults->pulse.proportions) {
+        free(proportions);
+    }
     return ret;
 }
 
@@ -3239,6 +3341,7 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
 
         for (i=0; i<graph->n_pulses; i++) {
             struct demes_pulse *pulse = graph->pulses + i;
+            int sources_node, proportions_node;
 
             if ((ret = append_sequence_mapping(&document, pulses_node,
                             YAML_FLOW_MAPPING_STYLE, &pulse_node))) {
@@ -3246,11 +3349,6 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
                 goto err3;
             }
 
-            if ((ret = append_mapping_string(&document, pulse_node, "source",
-                            pulse->source->name, 0))) {
-                ret = DEMES_ERR_YAML;
-                goto err3;
-            }
             if ((ret = append_mapping_string(&document, pulse_node, "dest",
                             pulse->dest->name, 0))) {
                 ret = DEMES_ERR_YAML;
@@ -3262,11 +3360,32 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
                 ret = DEMES_ERR_YAML;
                 goto err3;
             }
-            if ((ret = append_mapping_number(&document, pulse_node, "proportion",
-                            pulse->proportion))) {
+
+            if ((ret = append_mapping_sequence(&document, pulse_node,
+                            "sources", YAML_FLOW_SEQUENCE_STYLE,
+                            &sources_node))) {
                 ret = DEMES_ERR_YAML;
                 goto err3;
             }
+            if ((ret = append_mapping_sequence(&document, pulse_node,
+                            "proportions", YAML_FLOW_SEQUENCE_STYLE,
+                            &proportions_node))) {
+                ret = DEMES_ERR_YAML;
+                goto err3;
+            }
+            for (j=0; j<pulse->n_sources; j++) {
+                if ((ret = append_sequence_string(&document, sources_node,
+                                pulse->sources[j]->name, 0))) {
+                    ret = DEMES_ERR_YAML;
+                    goto err3;
+                }
+                if ((ret = append_sequence_number(&document, proportions_node,
+                                pulse->proportions[j]))) {
+                    ret = DEMES_ERR_YAML;
+                    goto err3;
+                }
+            }
+
         }
     }
 

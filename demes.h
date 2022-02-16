@@ -26,7 +26,7 @@ enum {
     DEMES_ERR_KEY, /* invalid field */
     DEMES_ERR_VALUE, /* invalid value */
     DEMES_ERR_MISSING_REQUIRED, /* required field is missing */
-    DEMES_ERR_PROPORTIONS, /* invalid proportion */
+    DEMES_ERR_PROPORTIONS, /* invalid proportion(s) */
 };
 
 enum size_function {
@@ -64,10 +64,11 @@ struct demes_migration {
 };
 
 struct demes_pulse {
-    struct demes_deme *source;
+    struct demes_deme **sources;
     struct demes_deme *dest;
     double time;
-    double proportion;
+    double *proportions;
+    size_t n_sources;
 };
 
 struct demes_graph {
