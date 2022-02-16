@@ -307,13 +307,6 @@ demes_deme_add_epoch(
         goto err0;
     }
 
-    if (selfing_rate + cloning_rate > 1.0) {
-        errmsg("deme %s: epochs[%zd]: must have selfing_rate + cloning_rate <= 1\n",
-                deme->name, deme->n_epochs);
-        ret = DEMES_ERR_VALUE;
-        goto err0;
-    }
-
     epoch = &deme->epochs[deme->n_epochs];
     epoch->end_time = end_time;
     epoch->start_size = start_size;
