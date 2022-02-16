@@ -973,6 +973,17 @@ err0:
     return ret;
 }
 
+static int
+value_is_null(yaml_node_t *value)
+{
+    if (value->type == YAML_SCALAR_NODE
+            && !u8_strcmp(value->data.scalar.value, (demes_char_t*)"null")) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 /**
  * Get the value node of a (key, value) pair under the given mapping node,
  * which matches the given key_name.
@@ -1023,16 +1034,12 @@ get_string(
     *string = NULL;
     value = get_value(document, node, key_name);
     if (value) {
-        if (value->type == YAML_SCALAR_NODE) {
-            if (!u8_strcmp(value->data.scalar.value, (demes_char_t*)"null")) {
-                // null here means no string (i.e. NULL)
-            } else {
-                *string = value->data.scalar.value;
-            }
-        } else {
+        if (value->type != YAML_SCALAR_NODE || value_is_null(value)) {
             errmsg("line %ld: %s: expected a string\n",
                     value->start_mark.line, key_name);
             ret = DEMES_ERR_TYPE;
+        } else {
+            *string = value->data.scalar.value;
         }
     }
     return ret;
@@ -1060,11 +1067,7 @@ get_string_list(
 
     list = get_value(document, node, key_name);
     if (list) {
-        if (list->type == YAML_SCALAR_NODE &&
-                !u8_strcmp(list->data.scalar.value, (demes_char_t*)"null")) {
-            // null here means no list (i.e. an empty list)
-            goto done;
-        } else if (list->type != YAML_SEQUENCE_NODE) {
+        if (list->type != YAML_SEQUENCE_NODE) {
             errmsg("line %ld: %s: expected a list\n",
                     list->start_mark.line, key_name);
             ret = DEMES_ERR_TYPE;
@@ -1085,7 +1088,7 @@ get_string_list(
             yaml_node_t *elm = yaml_document_get_node(
                     document, list->data.sequence.items.start[i]);
             assert(elm != NULL);
-            if (elm->type != YAML_SCALAR_NODE) {
+            if (elm->type != YAML_SCALAR_NODE || value_is_null(elm)) {
                 errmsg("line %ld: %s: expected a list of strings\n",
                         elm->start_mark.line, key_name);
                 ret = DEMES_ERR_TYPE;
@@ -1098,7 +1101,6 @@ get_string_list(
     *_strings = strings;
     *_length = length;
 
-done:
 err1:
     if (ret && strings) {
         free(strings);
@@ -1197,11 +1199,7 @@ get_number_list(
 
     list = get_value(document, node, key_name);
     if (list) {
-        if (list->type == YAML_SCALAR_NODE &&
-                !u8_strcmp(list->data.scalar.value, (demes_char_t*)"null")) {
-            // null here means no list (i.e. an empty list)
-            goto done;
-        } else if (list->type != YAML_SEQUENCE_NODE) {
+        if (list->type != YAML_SEQUENCE_NODE) {
             errmsg("line %ld: %s: expected a list\n",
                     list->start_mark.line, key_name);
             ret = DEMES_ERR_TYPE;
@@ -1222,7 +1220,7 @@ get_number_list(
             yaml_node_t *elm = yaml_document_get_node(
                     document, list->data.sequence.items.start[i]);
             assert(elm != NULL);
-            if (elm->type != YAML_SCALAR_NODE) {
+            if (elm->type != YAML_SCALAR_NODE || value_is_null(elm)) {
                 errmsg("line %ld: %s: expected a list of numbers\n",
                         elm->start_mark.line, key_name);
                 ret = DEMES_ERR_TYPE;
@@ -1235,7 +1233,6 @@ get_number_list(
     *_numbers = numbers;
     *_length = length;
 
-done:
 err1:
     if (ret && numbers) {
         free(numbers);
