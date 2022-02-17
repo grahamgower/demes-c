@@ -935,7 +935,7 @@ demes_graph_init(
         ret = DEMES_ERR_MISSING_REQUIRED;
         goto err0;
     }
-    graph->generation_time = NAN;
+    graph->generation_time = 1;
     if (!isnan(generation_time)) {
         if (isinf(generation_time) || generation_time <= 0) {
             errmsg("must have 0 > generation_time > infinity\n");
