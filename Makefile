@@ -23,7 +23,7 @@ memcheck: resolve
 
 # Compare resolution of graphs to the demes-python resolver.
 pytest: resolve
-	pytest -n auto --hypothesis-show-statistics tests/compare-demes-python.py
+	pytest -n auto tests/compare-reference-implementation.py
 
 clean:
 	rm -f resolve libdemes.a *.o
