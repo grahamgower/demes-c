@@ -696,13 +696,6 @@ demes_graph_add_pulse(
     int ret = 0;
     int i, j;
 
-    if (n_sources == 0) {
-        errmsg("pulses[%zd]: must specify at least one source deme\n",
-                graph->n_pulses);
-        ret = DEMES_ERR_VALUE;
-        goto err0;
-    }
-
     if (n_sources != n_proportions) {
         errmsg("pulses[%zd]: sources list and proportions list don't match\n",
                 graph->n_pulses);
@@ -1832,9 +1825,18 @@ demes_graph_parse_defaults_pulse(
             goto err0;
         }
 
-        if ((ret = get_string_list(document, pulse_node, "sources",
-                        &pulse->sources, &pulse->n_sources))) {
-            goto err0;
+        if (get_value(document, pulse_node, "sources")) {
+            if ((ret = get_string_list(document, pulse_node, "sources",
+                            &pulse->sources, &pulse->n_sources))) {
+                goto err0;
+            }
+            if (pulse->sources == NULL) {
+                yaml_node_t *key = get_value(document, pulse_node, "sources");
+                errmsg("line %ld: sources must be a non-empty list of deme names\n",
+                        key->start_mark.line);
+                ret = DEMES_ERR_VALUE;
+                goto err0;
+            }
         }
         if ((ret = get_string(document, pulse_node, "dest", &pulse->dest))) {
             goto err0;
@@ -1850,9 +1852,18 @@ demes_graph_parse_defaults_pulse(
             goto err0;
         }
 
-        if ((ret = get_number_list(document, pulse_node, "proportions",
-                        &pulse->proportions, &pulse->n_proportions))) {
-            goto err0;
+        if (get_value(document, pulse_node, "proportions")) {
+            if ((ret = get_number_list(document, pulse_node, "proportions",
+                            &pulse->proportions, &pulse->n_proportions))) {
+                goto err0;
+            }
+            if (pulse->proportions == NULL) {
+                yaml_node_t *key = get_value(document, pulse_node, "proportions");
+                errmsg("line %ld: proportions must be a non-empty list of numbers\n",
+                        key->start_mark.line);
+                ret = DEMES_ERR_VALUE;
+                goto err0;
+            }
         }
         if (pulse->proportions != NULL) {
             int i;
@@ -2641,6 +2652,13 @@ demes_graph_parse_pulses(
         if (get_value(document, pulse, "sources")) {
             if ((ret = get_string_list(document, pulse, "sources", &sources,
                             &n_sources))) {
+                goto err0;
+            }
+            if (sources == NULL) {
+                errmsg("line %ld: pulse[%d]: 'sources' must be a non-empty "
+                        "list of deme names\n",
+                        pulse->start_mark.line, i);
+                ret = DEMES_ERR_MISSING_REQUIRED;
                 goto err0;
             }
         }
