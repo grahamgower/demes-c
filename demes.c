@@ -3103,7 +3103,7 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
     locale_t locale_C, locale_saved;
     yaml_document_t document;
     int ret = 0;
-    int root, doi_node, demes_node;
+    int root, doi_node, demes_node, pulses_node, migrations_node;
     int i, j;
 
     /*
@@ -3140,6 +3140,11 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
                         graph->description, YAML_DOUBLE_QUOTED_SCALAR_STYLE))) {
             goto err3;
         }
+    } else {
+        if ((ret = append_mapping_string(&document, root, "description",
+                        (demes_char_t*)"", YAML_DOUBLE_QUOTED_SCALAR_STYLE))) {
+            goto err3;
+        }
     }
 
     {
@@ -3155,20 +3160,17 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
         }
     }
 
-    if (!isnan(graph->generation_time)) {
-        if ((ret = append_mapping_number(&document, root, "generation_time",
-                        graph->generation_time))) {
-            goto err3;
-        }
+    if ((ret = append_mapping_number(&document, root, "generation_time",
+                    graph->generation_time))) {
+        goto err3;
     }
 
+    if ((ret = append_mapping_sequence(&document, root, "doi",
+                    YAML_BLOCK_SEQUENCE_STYLE, &doi_node))) {
+        ret = DEMES_ERR_YAML;
+        goto err3;
+    }
     if (graph->doi) {
-        if ((ret = append_mapping_sequence(&document, root, "doi",
-                        YAML_BLOCK_SEQUENCE_STYLE, &doi_node))) {
-            ret = DEMES_ERR_YAML;
-            goto err3;
-        }
-
         for (i=0; i<graph->n_dois; i++) {
             if ((ret = append_sequence_string(&document, doi_node, graph->doi[i], YAML_DOUBLE_QUOTED_SCALAR_STYLE))) {
                 ret = DEMES_ERR_YAML;
@@ -3185,7 +3187,7 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
 
     for (i=0; i<graph->n_demes; i++) {
         struct demes_deme *deme = graph->demes + i;
-        int deme_node, epochs_node;
+        int deme_node, epochs_node, ancestors_node, proportions_node;
 
         if ((ret = append_sequence_mapping(&document, demes_node,
                         YAML_BLOCK_MAPPING_STYLE, &deme_node))) {
@@ -3199,7 +3201,15 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
         }
         if (deme->description) {
             if ((ret = append_mapping_string(&document, deme_node,
-                            "description", deme->description, YAML_DOUBLE_QUOTED_SCALAR_STYLE))) {
+                            "description", deme->description,
+                            YAML_DOUBLE_QUOTED_SCALAR_STYLE))) {
+                ret = DEMES_ERR_YAML;
+                goto err3;
+            }
+        } else {
+            if ((ret = append_mapping_string(&document, deme_node,
+                            "description", (demes_char_t*)"",
+                            YAML_DOUBLE_QUOTED_SCALAR_STYLE))) {
                 ret = DEMES_ERR_YAML;
                 goto err3;
             }
@@ -3210,21 +3220,19 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
             goto err3;
         }
 
+        if ((ret = append_mapping_sequence(&document, deme_node,
+                        "ancestors", YAML_FLOW_SEQUENCE_STYLE,
+                        &ancestors_node))) {
+            ret = DEMES_ERR_YAML;
+            goto err3;
+        }
+        if ((ret = append_mapping_sequence(&document, deme_node,
+                        "proportions", YAML_FLOW_SEQUENCE_STYLE,
+                        &proportions_node))) {
+            ret = DEMES_ERR_YAML;
+            goto err3;
+        }
         if (deme->ancestors) {
-            int ancestors_node, proportions_node;
-
-            if ((ret = append_mapping_sequence(&document, deme_node,
-                            "ancestors", YAML_FLOW_SEQUENCE_STYLE,
-                            &ancestors_node))) {
-                ret = DEMES_ERR_YAML;
-                goto err3;
-            }
-            if ((ret = append_mapping_sequence(&document, deme_node,
-                            "proportions", YAML_FLOW_SEQUENCE_STYLE,
-                            &proportions_node))) {
-                ret = DEMES_ERR_YAML;
-                goto err3;
-            }
             for (j=0; j<deme->n_ancestors; j++) {
                 if ((ret = append_sequence_string(&document, ancestors_node,
                                 deme->ancestors[j]->name, 0))) {
@@ -3305,108 +3313,100 @@ demes_graph_emit(struct demes_graph *graph, yaml_emitter_t *emitter)
         }
     }
 
-    if (graph->n_migrations > 0) {
-        int migrations_node, migration_node;
+    if ((ret = append_mapping_sequence(&document, root, "migrations",
+                    YAML_BLOCK_SEQUENCE_STYLE, &migrations_node))) {
+        ret = DEMES_ERR_YAML;
+        goto err3;
+    }
 
-        if ((ret = append_mapping_sequence(&document, root, "migrations",
-                        YAML_BLOCK_SEQUENCE_STYLE, &migrations_node))) {
+    for (i=0; i<graph->n_migrations; i++) {
+        struct demes_migration *migration = graph->migrations + i;
+        int migration_node;
+
+        if ((ret = append_sequence_mapping(&document, migrations_node,
+                        YAML_FLOW_MAPPING_STYLE, &migration_node))) {
             ret = DEMES_ERR_YAML;
             goto err3;
         }
 
-        for (i=0; i<graph->n_migrations; i++) {
-            struct demes_migration *migration = graph->migrations + i;
-
-            if ((ret = append_sequence_mapping(&document, migrations_node,
-                            YAML_FLOW_MAPPING_STYLE, &migration_node))) {
-                ret = DEMES_ERR_YAML;
-                goto err3;
-            }
-
-            if ((ret = append_mapping_string(&document, migration_node, "source",
-                            migration->source->name, 0))) {
-                ret = DEMES_ERR_YAML;
-                goto err3;
-            }
-            if ((ret = append_mapping_string(&document, migration_node, "dest",
-                            migration->dest->name, 0))) {
-                ret = DEMES_ERR_YAML;
-                goto err3;
-            }
-            if ((ret = append_mapping_number(&document, migration_node, "start_time",
-                            migration->start_time))) {
-                ret = DEMES_ERR_YAML;
-                goto err3;
-            }
-            if ((ret = append_mapping_number(&document, migration_node, "end_time",
-                            migration->end_time))) {
-                ret = DEMES_ERR_YAML;
-                goto err3;
-            }
-            if ((ret = append_mapping_number(&document, migration_node, "rate",
-                            migration->rate))) {
-                ret = DEMES_ERR_YAML;
-                goto err3;
-            }
+        if ((ret = append_mapping_string(&document, migration_node, "source",
+                        migration->source->name, 0))) {
+            ret = DEMES_ERR_YAML;
+            goto err3;
+        }
+        if ((ret = append_mapping_string(&document, migration_node, "dest",
+                        migration->dest->name, 0))) {
+            ret = DEMES_ERR_YAML;
+            goto err3;
+        }
+        if ((ret = append_mapping_number(&document, migration_node, "start_time",
+                        migration->start_time))) {
+            ret = DEMES_ERR_YAML;
+            goto err3;
+        }
+        if ((ret = append_mapping_number(&document, migration_node, "end_time",
+                        migration->end_time))) {
+            ret = DEMES_ERR_YAML;
+            goto err3;
+        }
+        if ((ret = append_mapping_number(&document, migration_node, "rate",
+                        migration->rate))) {
+            ret = DEMES_ERR_YAML;
+            goto err3;
         }
     }
 
-    if (graph->n_pulses> 0) {
-        int pulses_node, pulse_node;
+    if ((ret = append_mapping_sequence(&document, root, "pulses",
+                    YAML_BLOCK_SEQUENCE_STYLE, &pulses_node))) {
+        ret = DEMES_ERR_YAML;
+        goto err3;
+    }
 
-        if ((ret = append_mapping_sequence(&document, root, "pulses",
-                        YAML_BLOCK_SEQUENCE_STYLE, &pulses_node))) {
+    for (i=0; i<graph->n_pulses; i++) {
+        struct demes_pulse *pulse = graph->pulses + i;
+        int pulse_node, sources_node, proportions_node;
+
+        if ((ret = append_sequence_mapping(&document, pulses_node,
+                        YAML_FLOW_MAPPING_STYLE, &pulse_node))) {
             ret = DEMES_ERR_YAML;
             goto err3;
         }
 
-        for (i=0; i<graph->n_pulses; i++) {
-            struct demes_pulse *pulse = graph->pulses + i;
-            int sources_node, proportions_node;
+        if ((ret = append_mapping_string(&document, pulse_node, "dest",
+                        pulse->dest->name, 0))) {
+            ret = DEMES_ERR_YAML;
+            goto err3;
+        }
 
-            if ((ret = append_sequence_mapping(&document, pulses_node,
-                            YAML_FLOW_MAPPING_STYLE, &pulse_node))) {
+        if ((ret = append_mapping_number(&document, pulse_node, "time",
+                        pulse->time))) {
+            ret = DEMES_ERR_YAML;
+            goto err3;
+        }
+
+        if ((ret = append_mapping_sequence(&document, pulse_node,
+                        "sources", YAML_FLOW_SEQUENCE_STYLE,
+                        &sources_node))) {
+            ret = DEMES_ERR_YAML;
+            goto err3;
+        }
+        if ((ret = append_mapping_sequence(&document, pulse_node,
+                        "proportions", YAML_FLOW_SEQUENCE_STYLE,
+                        &proportions_node))) {
+            ret = DEMES_ERR_YAML;
+            goto err3;
+        }
+        for (j=0; j<pulse->n_sources; j++) {
+            if ((ret = append_sequence_string(&document, sources_node,
+                            pulse->sources[j]->name, 0))) {
                 ret = DEMES_ERR_YAML;
                 goto err3;
             }
-
-            if ((ret = append_mapping_string(&document, pulse_node, "dest",
-                            pulse->dest->name, 0))) {
+            if ((ret = append_sequence_number(&document, proportions_node,
+                            pulse->proportions[j]))) {
                 ret = DEMES_ERR_YAML;
                 goto err3;
             }
-
-            if ((ret = append_mapping_number(&document, pulse_node, "time",
-                            pulse->time))) {
-                ret = DEMES_ERR_YAML;
-                goto err3;
-            }
-
-            if ((ret = append_mapping_sequence(&document, pulse_node,
-                            "sources", YAML_FLOW_SEQUENCE_STYLE,
-                            &sources_node))) {
-                ret = DEMES_ERR_YAML;
-                goto err3;
-            }
-            if ((ret = append_mapping_sequence(&document, pulse_node,
-                            "proportions", YAML_FLOW_SEQUENCE_STYLE,
-                            &proportions_node))) {
-                ret = DEMES_ERR_YAML;
-                goto err3;
-            }
-            for (j=0; j<pulse->n_sources; j++) {
-                if ((ret = append_sequence_string(&document, sources_node,
-                                pulse->sources[j]->name, 0))) {
-                    ret = DEMES_ERR_YAML;
-                    goto err3;
-                }
-                if ((ret = append_sequence_number(&document, proportions_node,
-                                pulse->proportions[j]))) {
-                    ret = DEMES_ERR_YAML;
-                    goto err3;
-                }
-            }
-
         }
     }
 
