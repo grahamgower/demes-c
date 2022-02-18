@@ -42,11 +42,12 @@ memcheck_invalid() {
 }
 export -f memcheck_invalid
 
+JOBS=$(python3 -c "import os; print(os.cpu_count())")
 
-find input/valid -name \*.yaml -print0 \
-    | xargs -0 -n1 bash -c 'memcheck_valid "$@"' bash \
+find test-cases/valid -name \*.yaml -print0 \
+    | xargs -0 -n1 -P$JOBS bash -c 'memcheck_valid "$@"' bash \
     || exit 1
 
-find input/invalid -name \*.yaml -print0 \
-    | xargs -0 -n1 bash -c 'memcheck_invalid "$@"' bash \
+find test-cases/invalid -name \*.yaml -print0 \
+    | xargs -0 -n1 -P$JOBS bash -c 'memcheck_invalid "$@"' bash \
     || exit 1

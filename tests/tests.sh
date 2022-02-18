@@ -43,8 +43,12 @@ export -f locale_independent
 assert_failure() {
     yaml=$1
     $RESOLVE $yaml > /dev/null 2>&1
-    if [ $? = 0 ]; then
+    ret=$?
+    if [ $ret = 0 ]; then
         die "$yaml: failed to reject invalid model"
+    fi
+    if [ $ret -gt 128 ]; then
+        die "$yaml: resolver exited abnormally"
     fi
 }
 export -f assert_failure
@@ -63,22 +67,24 @@ $RESOLVE >/dev/null 2>&1 \
 $MOCKED_RESOLVE >/dev/null 2>&1 \
     && die "mocked resolver succeeded, despite no input file"
 
-find input/valid -name \*.yaml -print0 \
-    | xargs -0 -n1 bash -c 'resolve "$@"' bash \
+JOBS=$(python3 -c "import os; print(os.cpu_count())")
+
+find test-cases/valid -name \*.yaml -print0 \
+    | xargs -0 -n1 -P$JOBS bash -c 'resolve "$@"' bash \
     || exit 1
 
-find input/valid -name \*.yaml -print0 \
-    | xargs -0 -n1 bash -c 'idempotent "$@"' bash \
+find test-cases/valid -name \*.yaml -print0 \
+    | xargs -0 -n1 -P$JOBS bash -c 'idempotent "$@"' bash \
     || exit 1
 
-find input/valid -name \*.yaml -print0 \
-    | xargs -0 -n1 bash -c 'locale_independent "$@"' bash \
+find test-cases/valid -name \*.yaml -print0 \
+    | xargs -0 -n1 -P$JOBS bash -c 'locale_independent "$@"' bash \
     || exit 1
 
-find input/invalid -name \*.yaml -print0 \
-    | xargs -0 -n1 bash -c 'assert_failure "$@"' bash \
+find test-cases/invalid -name \*.yaml -print0 \
+    | xargs -0 -n1 -P$JOBS bash -c 'assert_failure "$@"' bash \
     || exit 1
 
-find input/valid -name \*.yaml -print0 \
-    | xargs -0 -n1 bash -c 'mocked_resolve "$@"' bash \
+find test-cases/valid -name \*.yaml -print0 \
+    | xargs -0 -n1 -P$JOBS bash -c 'mocked_resolve "$@"' bash \
     || exit 1

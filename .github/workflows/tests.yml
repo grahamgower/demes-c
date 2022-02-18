@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - name: install libyaml
         run: sudo apt install libyaml-dev
@@ -33,15 +35,11 @@ jobs:
       - name: setup python
         uses: actions/setup-python@v2
         with:
-          python-version: 3.9
+          python-version: "3.10"
 
       - name: install test dependencies
         run: |
-          pip install \
-            pytest \
-            pytest-xdist \
-            hypothesis \
-            git+https://github.com/popsim-consortium/demes-python.git
+          pip install -r tests/requirements.txt
 
       - name: run tests
         run: make pytest
@@ -54,6 +52,8 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - name: install libyaml
         run: sudo apt install libyaml-dev
@@ -75,6 +75,8 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - name: install libyaml
         run: sudo apt install libyaml-dev
