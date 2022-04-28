@@ -916,6 +916,7 @@ demes_graph_init(
         ret = DEMES_ERR_MEMORY;
         goto err0;
     }
+
     if (time_units) {
         graph->time_units = u8_strdup(time_units);
         if (graph->time_units == NULL) {
@@ -928,6 +929,7 @@ demes_graph_init(
         ret = DEMES_ERR_MISSING_REQUIRED;
         goto err0;
     }
+
     graph->generation_time = 1;
     if (!isnan(generation_time)) {
         if (isinf(generation_time) || generation_time <= 0) {
@@ -941,6 +943,13 @@ demes_graph_init(
         ret = DEMES_ERR_MISSING_REQUIRED;
         goto err0;
     }
+    if (!u8_strcmp(time_units, (demes_char_t *)"generations")
+            && graph->generation_time != 1) {
+        errmsg("time_units are generations but generation_time != 1\n");
+        ret = DEMES_ERR_VALUE;
+        goto err0;
+    }
+
     if (description) {
         graph->description = u8_strdup(description);
         if (graph->description == NULL) {
