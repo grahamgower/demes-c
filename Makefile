@@ -21,11 +21,12 @@ test:
 memcheck: resolve
 	cd tests && bash memcheck.sh
 
-# Compare resolution of graphs to the demes-python resolver.
+# Compare resolution of graphs to the reference implementation.
 pytest: resolve
 	pytest -n auto tests/compare-reference-implementation.py
 
 clean:
 	rm -f resolve libdemes.a *.o
 	rm -f *.gcda *.gcno *.gcov
+	rm -f core.*
 	$(MAKE) -C tests clean

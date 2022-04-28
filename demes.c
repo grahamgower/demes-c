@@ -677,6 +677,28 @@ err0:
     return ret;
 }
 
+/*
+ * Get a slot in the pulses memory for the given pulse time,
+ * such that pulses are insertion sorted in time-descending order.
+ * We assume that there is contiguous memory allocated for n_pulses,
+ * and that &pulses[n_pulses - 1] is a new unused slot.
+ */
+struct demes_pulse *
+get_pulse_pointer(struct demes_pulse *pulses, size_t n_pulses, double time)
+{
+    struct demes_pulse *p, *p_last;
+
+    p_last = &pulses[n_pulses - 1];
+    for (p=pulses; p!=p_last; p++) {
+        if (time > p->time) {
+            break;
+        }
+    }
+    // Shift pulses after the given time.
+    memmove(p + 1, p, (p_last - p)*(sizeof *p));
+
+    return p;
+}
 
 /**
  * Append a pulse to the @p graph.
@@ -797,7 +819,9 @@ demes_graph_add_pulse(
     }
     graph->pulses = pulses;
     graph->n_pulses++;
-    pulse = &pulses[graph->n_pulses - 1];
+
+    // Insert in time-descending order.
+    pulse = get_pulse_pointer(pulses, graph->n_pulses, time);
     pulse->sources = NULL;
     pulse->dest = dest_deme;
     pulse->time = time;
