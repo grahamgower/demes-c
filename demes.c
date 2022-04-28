@@ -677,6 +677,28 @@ err0:
     return ret;
 }
 
+/*
+ * Get a slot in the pulses memory for the given pulse time,
+ * such that pulses are insertion sorted in time-descending order.
+ * We assume that there is contiguous memory allocated for n_pulses,
+ * and that &pulses[n_pulses - 1] is a new unused slot.
+ */
+struct demes_pulse *
+get_pulse_pointer(struct demes_pulse *pulses, size_t n_pulses, double time)
+{
+    struct demes_pulse *p, *p_last;
+
+    p_last = &pulses[n_pulses - 1];
+    for (p=pulses; p!=p_last; p++) {
+        if (time > p->time) {
+            break;
+        }
+    }
+    // Shift pulses after the given time.
+    memmove(p + 1, p, (p_last - p)*(sizeof *p));
+
+    return p;
+}
 
 /**
  * Append a pulse to the @p graph.
@@ -797,7 +819,9 @@ demes_graph_add_pulse(
     }
     graph->pulses = pulses;
     graph->n_pulses++;
-    pulse = &pulses[graph->n_pulses - 1];
+
+    // Insert in time-descending order.
+    pulse = get_pulse_pointer(pulses, graph->n_pulses, time);
     pulse->sources = NULL;
     pulse->dest = dest_deme;
     pulse->time = time;
@@ -916,6 +940,7 @@ demes_graph_init(
         ret = DEMES_ERR_MEMORY;
         goto err0;
     }
+
     if (time_units) {
         graph->time_units = u8_strdup(time_units);
         if (graph->time_units == NULL) {
@@ -928,6 +953,7 @@ demes_graph_init(
         ret = DEMES_ERR_MISSING_REQUIRED;
         goto err0;
     }
+
     graph->generation_time = 1;
     if (!isnan(generation_time)) {
         if (isinf(generation_time) || generation_time <= 0) {
@@ -941,6 +967,13 @@ demes_graph_init(
         ret = DEMES_ERR_MISSING_REQUIRED;
         goto err0;
     }
+    if (!u8_strcmp(time_units, (demes_char_t *)"generations")
+            && graph->generation_time != 1) {
+        errmsg("time_units are generations but generation_time != 1\n");
+        ret = DEMES_ERR_VALUE;
+        goto err0;
+    }
+
     if (description) {
         graph->description = u8_strdup(description);
         if (graph->description == NULL) {
