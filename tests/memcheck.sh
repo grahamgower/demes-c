@@ -10,11 +10,18 @@ export -f die
 
 memcheck() {
     yaml=$1
-    valgrind -q --leak-check=full --error-exitcode=255 $RESOLVE $yaml >/dev/null
+    vg_out=$(mktemp --tmpdir demes-c-memcheck.XXXXXX)
+    valgrind \
+        -q --leak-check=full --error-exitcode=255 --log-file=$vg_out \
+        $RESOLVE $yaml >/dev/null 2>&1
     ret=$?
     if [ $ret -ge 128 ]; then
-        die "$yaml: memory error"
+        echo "$yaml: memory error"
+        cat $vg_out
+        rm $vg_out
+        exit 255
     fi
+    rm $vg_out
     return $ret
 }
 export -f memcheck
