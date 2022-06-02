@@ -1,7 +1,0 @@
-time_units: generations
-defaults:
-  epoch: {end_size: {}}
-demes:
-- name: a
-  epochs:
-  - start_size: 1

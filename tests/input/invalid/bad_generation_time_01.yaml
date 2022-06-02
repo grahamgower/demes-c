@@ -1,6 +1,0 @@
-time_units: generations
-generation_time: []
-demes:
-  - name: a
-    epochs:
-    - start_size: 100

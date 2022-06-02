@@ -1,6 +1,0 @@
-time_units: generations
-doi: [[]]
-demes:
-  - name: a
-    epochs:
-    - start_size: 100
