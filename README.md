@@ -36,6 +36,6 @@ There are three test-related targets in the toplevel Makefile.
   to simulate failures. This can take a few minutes to run.
 * `make pytest` compares the output of the C resolver to the
   output of the reference implementation in the demes-spec repo.
-  This needs Python >= 3.10 with the packages listed in `requirements.txt`.
+  This needs Python >= 3.10 with the packages listed in `tests/requirements.txt`.
 * Each of the above Makefile targets are called during the continuous
   integration github action that gets run when a pull request is opened.
