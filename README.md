@@ -1,5 +1,5 @@
 # About
-demes-c is A C library for parsing [Demes demographic models](https://popsim-consortium.github.io/demes-spec-docs/) using libyaml.
+demes-c is a C library for parsing [Demes demographic models](https://popsim-consortium.github.io/demes-spec-docs/) using libyaml.
 
 # Installation
 Clone the repository and type `make`.
@@ -27,7 +27,9 @@ git submodule init
 git submodule update
 ```
 
-There are three test-related targets in the toplevel Makefile.
+There are three test-related targets in the toplevel Makefile,
+which are called during the continuous integration github action
+that gets run when a pull request is opened.
 
 * `make test` checks that all valid test cases in the demes-spec repo
   can be loaded and that all invalid test cases are correctly rejected.
@@ -37,5 +39,3 @@ There are three test-related targets in the toplevel Makefile.
 * `make pytest` compares the output of the C resolver to the
   output of the reference implementation in the demes-spec repo.
   This needs Python >= 3.10 with the packages listed in `tests/requirements.txt`.
-* Each of the above Makefile targets are called during the continuous
-  integration github action that gets run when a pull request is opened.
