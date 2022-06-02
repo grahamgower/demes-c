@@ -1,6 +1,0 @@
-time_units: years
-generation_time: sixteen
-demes:
-  - name: a
-    epochs:
-    - start_size: 100

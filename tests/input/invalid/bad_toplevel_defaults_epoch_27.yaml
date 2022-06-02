@@ -1,7 +1,0 @@
-time_units: generations
-defaults:
-  epoch: {selfing_rate: .inf}
-demes:
-- name: a
-  epochs:
-  - start_size: 1
