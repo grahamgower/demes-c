@@ -7,7 +7,11 @@ test: setup
 setup:
 	$(MAKE) -C .. clean
 	$(MAKE) -C .. CFLAGS="$(CFLAGS)" resolve
-	$(MAKE) mocked-resolve
+	# mocked-resolve is broken on MacOS
+	case "$$OSTYPE" in \
+		darwin*) ;; \
+		*) $(MAKE) mocked-resolve ;; \
+	esac
 
 # Ideally, we'd just LD_PRELOAD mockfail.so, but I couldn't get this to work.
 # When using a binary built with --coverage, the coverage stats are dumped to
