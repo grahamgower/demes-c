@@ -1,5 +1,6 @@
 CFLAGS=-Wall -O0 -g --coverage -fPIC
-CC=gcc -std=c11 -D_POSIX_C_SOURCE=200809L
+#CC=gcc -std=c11 -D_POSIX_C_SOURCE=200809L
+CC=gcc -std=c11 -D_GNU_SOURCE
 
 test: setup
 	bash tests.sh
@@ -7,7 +8,11 @@ test: setup
 setup:
 	$(MAKE) -C .. clean
 	$(MAKE) -C .. CFLAGS="$(CFLAGS)" resolve
-	$(MAKE) mocked-resolve
+	# mocked-resolve is broken on MacOS
+	case "$$OSTYPE" in \
+		darwin*) ;; \
+		*) $(MAKE) mocked-resolve ;; \
+	esac
 
 # Ideally, we'd just LD_PRELOAD mockfail.so, but I couldn't get this to work.
 # When using a binary built with --coverage, the coverage stats are dumped to

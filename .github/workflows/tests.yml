@@ -8,7 +8,7 @@ on:
 
 jobs:
   canceller:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: cancel previous runs
         uses: styfle/cancel-workflow-action@0.9.0
@@ -16,9 +16,11 @@ jobs:
           access_token: ${{ github.token }}
 
   compare-demes-python:
-    runs-on: ubuntu-18.04
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      matrix:
+        os: [ubuntu-18.04, macos-10.15]
 
     steps:
       - name: checkout
@@ -27,7 +29,12 @@ jobs:
           submodules: true
 
       - name: install libyaml
-        run: sudo apt install libyaml-dev
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt install libyaml-dev
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install libyaml
+          fi
 
       - name: build
         run: make
@@ -45,6 +52,7 @@ jobs:
         run: make pytest
 
   memcheck:
+    # Valgrind only runs on Linux.
     runs-on: ubuntu-18.04
     strategy:
       fail-fast: false
@@ -68,9 +76,13 @@ jobs:
         run: make memcheck
 
   tests:
-    runs-on: ubuntu-18.04
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      matrix:
+        os: [ubuntu-18.04, macos-10.15]
+    env:
+      OS: ${{ matrix.os }}
 
     steps:
       - name: checkout
@@ -79,12 +91,22 @@ jobs:
           submodules: true
 
       - name: install libyaml
-        run: sudo apt install libyaml-dev
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt install libyaml-dev
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install libyaml
+          fi
+
+      - name: install md5sum
+        if: runner.os == 'macOS'
+        run: brew install md5sha1sum
 
       - name: run tests
         run: make test
 
       - name: upload coverage report to codecov
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v3
         with:
           fail_ci_if_error: true
+          env_vars: OS

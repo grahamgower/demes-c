@@ -9,6 +9,9 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <locale.h>
+#ifdef __APPLE__
+#include <xlocale.h>
+#endif
 
 #include <yaml.h>
 

@@ -64,8 +64,6 @@ export -f mocked_resolve
 
 $RESOLVE >/dev/null 2>&1 \
     && die "resolver succeeded, despite no input file"
-$MOCKED_RESOLVE >/dev/null 2>&1 \
-    && die "mocked resolver succeeded, despite no input file"
 
 JOBS=$(python3 -c "import os; print(os.cpu_count())")
 
@@ -85,6 +83,16 @@ find test-cases/invalid -name \*.yaml -print0 \
     | xargs -0 -n1 -P$JOBS bash -c 'assert_failure "$@"' bash \
     || exit 1
 
-find test-cases/valid -name \*.yaml -print0 \
-    | xargs -0 -n1 -P$JOBS bash -c 'mocked_resolve "$@"' bash \
-    || exit 1
+# mocked-resolve is broken on MacOS
+case "$OSTYPE" in
+    darwin*) ;;
+    *)
+        echo "running mocked tests"
+        $MOCKED_RESOLVE >/dev/null 2>&1 \
+            && die "mocked resolver succeeded, despite no input file"
+
+        find test-cases/valid -name \*.yaml -print0 \
+            | xargs -0 -n1 -P$JOBS bash -c 'mocked_resolve "$@"' bash \
+            || exit 1
+    ;;
+esac

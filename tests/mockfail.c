@@ -2,12 +2,16 @@
    To test memory allocation failures, we wrap the allocation functions
    so they fail after a certain number of invocations.
 */
-#define _GNU_SOURCE
+/*#define _GNU_SOURCE*/
 #include <stdio.h>
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <locale.h>
 #include <errno.h>
+#ifdef __APPLE__
+#include <xlocale.h>
+#endif
+
 #include "yaml.h"
 
 // libc
