@@ -98,6 +98,10 @@ jobs:
             brew install libyaml
           fi
 
+      - name: install md5sum
+        if: runner.os == 'macOS'
+        run: brew install md5sha1sum
+
       - name: run tests
         run: make test
 

@@ -1,5 +1,6 @@
 CFLAGS=-Wall -O0 -g --coverage -fPIC
-CC=gcc -std=c11 -D_POSIX_C_SOURCE=200809L
+#CC=gcc -std=c11 -D_POSIX_C_SOURCE=200809L
+CC=gcc -std=c11 -D_GNU_SOURCE
 
 test: setup
 	bash tests.sh
